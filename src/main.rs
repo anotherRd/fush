@@ -6,7 +6,7 @@ pub mod config;
 use clap::{Parser, CommandFactory};
 use std::env;
 use std::process::{Command, Stdio};
-use crate::helper::{read_from_input, split_selected};
+use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container};
 use crate::config::{tmp_list_file, key_dir};
 use crate::migration::migrate;
 use crate::database::get_db_pool;
@@ -205,13 +205,8 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     // connect
     match prefix.as_str() {
         "container" => {
-            let shells = vec!["bash", "ash", "sh"];
-            for shell in shells {
-                let shell_status = Command::new("docker").args(["exec", "-it", &selected, &shell]).status()?;
-                if shell_status.success() {
-                    break;
-                }
-            }
+            // execute docker exec
+            connect_to_container(&selected, vec![])?;
         },
         "server" => {
             // get from database
@@ -223,22 +218,32 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
             // split address and port
             let name: String = row.get("name");
             let address: String = row.get("address");
-            let address: Vec<&str> = address.split(":").collect();
-
-            // ssh args
-            let mut ssh_args = vec![&address[0], "-p", &address[1]];
-
-            // check if theres keys
-            let key_dir = key_dir()?;
-            let key_path = format!("{}/{}", &key_dir, &name);
-            if Path::new(&key_path).exists() {
-                ssh_args.extend(["-i", &key_path]);
-            }
             
             // execute ssh
-            Command::new("ssh")
-                .args(ssh_args)
-                .status()?;
+            connect_to_server(&name, &address, &vec![])?;
+        },
+        "server container" => {
+            // get from database
+            let row = sqlx::query("SELECT 
+                    nodes.*,
+                    server.name as server_name,
+                    server.address as server_address
+                    FROM nodes
+                    JOIN nodes AS server ON nodes.parent_id = server.id
+                    WHERE nodes.name = ?
+                ")
+                .bind(&selected)
+                .fetch_one(&pool)
+                .await?;
+            
+            // split address and port
+            let container_name: String = row.get("name");
+            let container_address: String = row.get("address");
+            let server_name: String = row.get("server_name");
+            let server_address: String = row.get("server_address");
+            
+            // execute ssh
+            connect_to_server_container(&container_name, &container_address, &server_name, &server_address, vec!["-t"])?;
         },
         _ => ()
     }
