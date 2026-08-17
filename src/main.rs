@@ -3,7 +3,7 @@ pub mod migration;
 pub mod database;
 pub mod config;
 
-use clap::Parser;
+use clap::{Parser, CommandFactory};
 use std::env;
 use std::process::{Command, Stdio};
 use crate::helper::{read_from_input, split_selected};
@@ -251,10 +251,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // migrate db
     let _ = migrate().await?;
 
-    // // args not provided
-    // if env::args().len() == 1 {
-    //     let _ = connect().await;
-    // }
+    // args not provided
+    if env::args().len() == 1 {
+        Args::command().print_help()?;
+    }
 
     // get args
     let args = Args::parse();
