@@ -7,17 +7,19 @@ use clap::Parser;
 use std::env;
 use std::process::{Command, Stdio};
 use crate::helper::{read_from_input, split_selected};
-use crate::config::{tmp_list_file};
+use crate::config::{tmp_list_file, key_dir};
 use crate::migration::migrate;
 use crate::database::get_db_pool;
 use std::io::{Write};
 use std::fs::File;
 use sqlx::{Row};
 use crate::config::{init_config};
-
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 struct Args {
+    #[arg(short, long)]
+    connect: bool,
     #[arg(short, long)]
     new: bool,
     #[arg(short, long)]
@@ -26,24 +28,28 @@ struct Args {
     edit: bool,
 }
 
-async fn add_node() -> Result<(), Box<dyn std::error::Error>> {
+async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
     let name = read_from_input("Name", None, vec![])?;
     let user = read_from_input("User", None, vec![])?;
     let host = read_from_input("Host", None, vec![])?;
     let port = read_from_input("Port (22)", Some("22"), vec![])?;
     let auth_type_choice = read_from_input("Auth Type [(k)ey/(p)assword]?", None, vec!["k", "p"])?;
 
-    let mut auth_type = "key";
+    let auth_type;
+    let mut generate_key = "n".to_string();
     match auth_type_choice.as_str() {
         // key
         "k" => {
-            let generate_key = &read_from_input("Generate new key (use default key if no) [y/n]?", None, vec!["y", "n"])?;
+            auth_type = "key";
+            generate_key = read_from_input("Generate new key (use default key if no) [y/n]?", None, vec!["y", "n"])?;
         },
         // password
         "p" => {
             auth_type = "password";
         }
-        _ => {}
+        _ => {
+            auth_type = "";
+        }
     }
 
     let port = if port == "" { "22" } else { &port };
@@ -69,6 +75,14 @@ async fn add_node() -> Result<(), Box<dyn std::error::Error>> {
         .bind(&auth_type)
         .execute(&pool)
         .await?;
+
+    // generate key for this node
+    if generate_key == "y" {
+        let key_location = format!("{}/{}", &key_dir()?, name);
+        Command::new("ssh-keygen")
+            .args(["-f", &key_location])
+            .output()?;
+    }
 
     Ok(())
 }
@@ -107,7 +121,7 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // format raw selected
+    // format selected raw 
     let mut selected_names = Vec::new();
     for selected in selections {
         let (prefix, selected) = split_selected(&selected);
@@ -125,6 +139,7 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
         placeholders
     );
 
+    // bind actual data
     let mut q = sqlx::query(&query);
     for selected_name in &selected_names {
         q = q.bind(selected_name);
@@ -176,28 +191,50 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
         .trim()
         .to_string();
 
-    // get selected
+    // return if nothing is selected
+    if selected == "" {
+        return Ok(())
+    }
+
     println!("Selected: {selected}");
     let (prefix, selected) = split_selected(&selected);
 
     // connect
     match prefix.as_str() {
         "container" => {
-            Command::new("docker")
-                .args(["exec", "-it", &selected, "sh"])
-                .status()?;
+            let shells = vec!["bash", "ash", "sh"];
+            for shell in shells {
+                let shell_status = Command::new("docker").args(["exec", "-it", &selected, &shell]).status()?;
+                if shell_status.success() {
+                    break;
+                }
+            }
         },
         "server" => {
+            // get from database
             let row = sqlx::query("SELECT * FROM nodes WHERE name = ?")
                 .bind(&selected)
                 .fetch_one(&pool)
                 .await?;
             
+            // split address and port
+            let name: String = row.get("name");
             let address: String = row.get("address");
             let address: Vec<&str> = address.split(":").collect();
+
+            // ssh args
+            let mut ssh_args = vec![&address[0], "-p", &address[1]];
+
+            // check if theres keys
+            let key_dir = key_dir()?;
+            let key_path = format!("{}/{}", &key_dir, &name);
+            if Path::new(&key_path).exists() {
+                ssh_args.extend(["-i", &key_path]);
+            }
             
+            // execute ssh
             Command::new("ssh")
-                .args([&address[0], "-p", &address[1]])
+                .args(ssh_args)
                 .status()?;
         },
         _ => ()
@@ -214,16 +251,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // migrate db
     let _ = migrate().await?;
 
-    // args not provided
-    if env::args().len() == 1 {
-        let _ = connect().await;
-    }
+    // // args not provided
+    // if env::args().len() == 1 {
+    //     let _ = connect().await;
+    // }
 
     // get args
     let args = Args::parse();
 
+    if args.connect {
+        connect().await?;
+    }
+    
     if args.new {
-        add_node().await?;
+        new_node().await?;
     }
     
     if args.delete {

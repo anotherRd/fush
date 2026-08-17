@@ -21,7 +21,13 @@ pub fn tmp_dir() -> String {
 
 pub fn db_file() -> Result<String, Box<dyn std::error::Error>> {
     return Ok(
-        format!("/{}/data.db", &config_dir()?)
+        format!("{}/data.db", &config_dir()?)
+    );
+}
+
+pub fn key_dir() -> Result<String, Box<dyn std::error::Error>> {
+    return Ok(
+        format!("{}/keys", &config_dir()?)
     );
 }
 
@@ -44,10 +50,15 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
         .create(true)
         .open(&db_file()?)?;
 
+    // create config dir if not exists
+    let key_dir = key_dir()?;
+    let path = Path::new(&key_dir);
+    fs::create_dir_all(path)?;
+
     Ok(())
 }
 
 pub fn tmp_list_file() -> String {
     let tmp_dir = tmp_dir();
-    return format!("/{}/list", &tmp_dir);
+    return format!("{}/list", &tmp_dir);
 }
