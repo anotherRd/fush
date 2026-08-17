@@ -21,6 +21,8 @@ struct Args {
     #[arg(short, long)]
     connect: bool,
     #[arg(short, long)]
+    scan_server_container: bool,
+    #[arg(short, long)]
     new: bool,
     #[arg(short, long)]
     delete: bool,
@@ -155,8 +157,7 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     // get local active container
     let output = Command::new("docker")
         .args(["ps", "--format", "{{.Names}}"])
-        .output()
-        .expect("failed to run docker");
+        .output()?;
 
     // turn it to vec
     let containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
@@ -178,7 +179,9 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     // write to tmp file
     for row in rows {
         let name: String = row.get("name");
-        writeln!(file, "server: {name}")?;
+        let node_type: String = row.get("node_type");
+        let node_type_caption = node_type.replace("_", " ");
+        writeln!(file, "{node_type_caption}: {name}")?;
     }
 
     // start fzf
@@ -243,6 +246,82 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn scan_server_container()-> Result<(), Box<dyn std::error::Error>> {
+    let pool = get_db_pool().await?;
+
+    let mut tx = pool.begin().await?;
+    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
+        .fetch_all(&pool)
+        .await?;
+
+    // write to tmp file
+    for row in rows {
+        let id: i64 = row.get("id");
+        let name: String = row.get("name");
+        let address: String = row.get("address");
+        let address: Vec<&str> = address.split(":").collect();
+        
+        // ssh args
+        let mut ssh_args = vec![&address[0], "-p", &address[1]];
+
+        // check if theres keys
+        let key_dir = key_dir()?;
+        let key_path = format!("{}/{}", &key_dir, &name);
+        if Path::new(&key_path).exists() {
+            ssh_args.extend(["-i", &key_path]);
+        }
+        ssh_args.extend(["-t", "docker ps --format {{.Names}}"]);
+
+        // execute ssh
+        let output = Command::new("ssh")
+            .args(ssh_args)
+            .output()?;
+
+        // turn it to vec
+        let containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(String::from)
+            .collect();
+
+        // delete server container on current node
+        sqlx::query(
+                    "DELETE FROM nodes WHERE parent_id = ?"
+                )
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+
+        for container in containers {
+            let node_name = format!("{name}: {container}");
+            sqlx::query(
+                    "INSERT INTO nodes (
+                        name,
+                        address,
+                        node_type,
+                        auth_type,
+                        parent_id
+                    ) VALUES (
+                        ?, 
+                        ?,
+                        ?,
+                        ?,
+                        ?
+                    )"
+                )
+                .bind(&node_name)
+                .bind(&container)
+                .bind("server_container")
+                .bind("container")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
+    tx.commit().await?;
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // init config
@@ -261,14 +340,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.connect {
         connect().await?;
-    }
-    
-    if args.new {
+    } else if args.new {
         new_node().await?;
-    }
-    
-    if args.delete {
+    } else if args.delete {
         delete_node().await?;
+    } else if args.scan_server_container {
+        scan_server_container().await?;
     }
 
     Ok(())
