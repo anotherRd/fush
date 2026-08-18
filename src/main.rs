@@ -6,7 +6,7 @@ pub mod config;
 use clap::{Parser, CommandFactory};
 use std::env;
 use std::process::{Command};
-use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, db_array_placeholders, connect_to_server_args, select_server, select_multi_server, select_nodes, create_key_pair, key_pair_exists};
+use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, db_array_placeholders, connect_to_server_args, select_server, select_multi_server, select_nodes, create_key_pair, key_pair_exists, check_requirement};
 use crate::config::{key_dir};
 use crate::migration::migrate;
 use crate::database::get_db_pool;
@@ -412,6 +412,9 @@ async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // check requirement
+    let _ = check_requirement();
+
     // init config
     let _ = init_config()?;
 

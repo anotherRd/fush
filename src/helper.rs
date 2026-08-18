@@ -7,6 +7,28 @@ use crate::database::get_db_pool;
 use sqlx::Row;
 use std::fs;
 
+pub fn check_requirement() {
+    let commands = vec![
+        "ssh",
+        "ssh-keygen",
+        "docker",
+        "fzf",
+    ];
+
+    let missing: Vec<_> = commands
+        .into_iter()
+        .filter(|command| which::which(command).is_err())
+        .collect();
+
+    for command in &missing {
+        eprintln!("ERROR missing: {command}");
+    }
+
+    if missing.len() > 0 {
+        std::process::exit(1);
+    }
+}
+
 pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>, required: bool) -> Result<String, Box<dyn std::error::Error>> {
     let mut input = String::new();
     let mut trimmed_input = "";
