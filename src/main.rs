@@ -6,12 +6,10 @@ pub mod config;
 use clap::{Parser, CommandFactory};
 use std::env;
 use std::process::{Command};
-use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, multi_selection, db_array_placeholders, selection, connect_to_server_args};
-use crate::config::{tmp_list_file, key_dir};
+use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, db_array_placeholders, connect_to_server_args, select_server, select_multi_server, select_nodes};
+use crate::config::{key_dir};
 use crate::migration::migrate;
 use crate::database::get_db_pool;
-use std::io::{Write};
-use std::fs::File;
 use sqlx::{Row};
 use crate::config::{init_config};
 use std::path::Path;
@@ -129,22 +127,12 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut to_be_deleted_keys: Vec<String> = Vec::new();
     let mut delete_all_keys = "".to_string();
-    let mut file = File::create(&tmp_list_file())?;
 
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
 
-    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
-        .fetch_all(&pool)
-        .await?;
-
-    for row in rows {
-        let name: String = row.get("name");
-        writeln!(file, "server: {name}")?;
-    }
-
     // start multi selection
-    let selections = multi_selection()?;
+    let selections = select_multi_server().await?;
 
     // if nothing is selected
     if selections.len() == 0 {
@@ -213,38 +201,10 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn connect()-> Result<(), Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file())?;
-
-    // get local active container
-    if let Ok(output) = Command::new("docker").args(["ps", "--format", "{{.Names}}"]).output() {
-        // turn it to vec
-        let containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(String::from)
-            .collect();
-    
-        // write to tmp file
-        for container in containers {
-            writeln!(file, "container: {container}")?;
-        }
-    }
-
-    // get from db
     let pool = get_db_pool().await?;
-    let rows = sqlx::query("SELECT * FROM nodes")
-        .fetch_all(&pool)
-        .await?;
-
-    // write to tmp file
-    for row in rows {
-        let name: String = row.get("name");
-        let node_type: String = row.get("node_type");
-        let node_type_caption = node_type.replace("_", " ");
-        writeln!(file, "{node_type_caption}: {name}")?;
-    }
 
     // start selection
-    let selected = selection()?;
+    let selected = select_nodes().await?;
 
     // return if nothing is selected
     if selected == "" {
@@ -310,24 +270,12 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
 async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
-
-    let mut rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
-        .fetch_all(&pool)
-        .await?;
+    let rows;
 
     // select nodes if scan all is false
     if !scan_all {
-        let mut file = File::create(&tmp_list_file())?;
-        // write to tmp file
-        for row in rows {
-            let name: String = row.get("name");
-            let node_type: String = row.get("node_type");
-            let node_type_caption = node_type.replace("_", " ");
-            writeln!(file, "{node_type_caption}: {name}")?;
-        }
-
         // start multi selection
-        let selections = multi_selection()?;
+        let selections = select_multi_server().await?;
 
         // if nothing is selected
         if selections.len() == 0 {
@@ -353,9 +301,13 @@ async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
             q = q.bind(selected_name);
         }
         rows = q.fetch_all(&mut *tx).await?;
+    } else {
+        rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
+            .fetch_all(&pool)
+            .await?;
     }
 
-    // write to tmp file
+    // scanning
     for row in rows {
         let id: i64 = row.get("id");
         let name: String = row.get("name");
@@ -420,24 +372,8 @@ async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
 }
 
 async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file())?;
-
-    // get from db
-    let pool = get_db_pool().await?;
-    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
-        .fetch_all(&pool)
-        .await?;
-
-    // write to tmp file
-    for row in rows {
-        let name: String = row.get("name");
-        let node_type: String = row.get("node_type");
-        let node_type_caption = node_type.replace("_", " ");
-        writeln!(file, "{node_type_caption}: {name}")?;
-    }
-
     // start selection
-    let selected = selection()?;
+    let selected = select_server().await?;
 
     // return if nothing is selected
     if selected == "" {

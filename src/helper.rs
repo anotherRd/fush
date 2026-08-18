@@ -3,6 +3,8 @@ use crate::config::{key_dir, tmp_list_file};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::fs::File;
+use crate::database::get_db_pool;
+use sqlx::Row;
 
 pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>) -> Result<String, Box<dyn std::error::Error>> {
     let mut input = String::new();
@@ -186,4 +188,80 @@ pub fn db_array_placeholders(data_length: usize) -> String {
         .take(data_length)
         .collect::<Vec<_>>()
         .join(",")
+}
+
+pub async fn select_nodes() -> Result <String, Box<dyn std::error::Error>> {
+    let mut file = File::create(&tmp_list_file())?;
+
+    // get local active container
+    if let Ok(output) = Command::new("docker").args(["ps", "--format", "{{.Names}}"]).output() {
+        // turn it to vec
+        let containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(String::from)
+            .collect();
+    
+        // write to tmp file
+        for container in containers {
+            writeln!(file, "container: {container}")?;
+        }
+    }
+
+    // get nodes
+    let pool = get_db_pool().await?;
+    let rows = sqlx::query("SELECT * FROM nodes")
+        .fetch_all(&pool)
+        .await?;
+
+    // write to tmp file
+    for row in rows {
+        let name: String = row.get("name");
+        let node_type: String = row.get("node_type");
+        let node_type_caption = node_type.replace("_", " ");
+        writeln!(file, "{node_type_caption}: {name}")?;
+    }
+
+    let selected = selection()?;
+
+    Ok(selected)
+}
+
+pub async fn select_server() -> Result <String, Box<dyn std::error::Error>> {
+    let mut file = File::create(&tmp_list_file())?;
+    let pool = get_db_pool().await?;
+    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
+        .fetch_all(&pool)
+        .await?;
+
+    // write to tmp file
+    for row in rows {
+        let name: String = row.get("name");
+        let node_type: String = row.get("node_type");
+        let node_type_caption = node_type.replace("_", " ");
+        writeln!(file, "{node_type_caption}: {name}")?;
+    }
+
+    let selected = selection()?;
+
+    Ok(selected)
+}
+
+pub async fn select_multi_server() -> Result <Vec<String>, Box<dyn std::error::Error>> {
+    let mut file = File::create(&tmp_list_file())?;
+    let pool = get_db_pool().await?;
+    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
+        .fetch_all(&pool)
+        .await?;
+
+    // write to tmp file
+    for row in rows {
+        let name: String = row.get("name");
+        let node_type: String = row.get("node_type");
+        let node_type_caption = node_type.replace("_", " ");
+        writeln!(file, "{node_type_caption}: {name}")?;
+    }
+
+    let selections = multi_selection()?;
+
+    Ok(selections)
 }
