@@ -158,19 +158,17 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     let mut file = File::create(&tmp_list_file())?;
 
     // get local active container
-    let output = Command::new("docker")
-        .args(["ps", "--format", "{{.Names}}"])
-        .output()?;
-
-    // turn it to vec
-    let containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(String::from)
-        .collect();
-
-    // write to tmp file
-    for container in containers {
-        writeln!(file, "container: {container}")?;
+    if let Ok(output) = Command::new("docker").args(["ps", "--format", "{{.Names}}"]).output() {
+        // turn it to vec
+        let containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(String::from)
+            .collect();
+    
+        // write to tmp file
+        for container in containers {
+            writeln!(file, "container: {container}")?;
+        }
     }
 
     // get from db
@@ -394,7 +392,7 @@ async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
         let key_content = fs::read_to_string(&key_path)?;
         println!("{key_content}");
     } else {
-        println!("Key not found for: {selected}");
+        eprintln!("Key not found for: {selected}");
     }
 
     Ok(())
