@@ -49,7 +49,6 @@ pub fn split_selected(selected: &str) -> (String, String) {
 pub fn connect_to_server_args<'a>(
     name: &'a str,
     address: &'a str,
-    auth_type: &'a str,
     default_key: bool,
     additional_args: &Vec<&'a str>
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> { 
@@ -66,7 +65,7 @@ pub fn connect_to_server_args<'a>(
     ];
 
     // check if using key or password
-    if auth_type == "key" && !default_key {
+    if !default_key {
         // check key exists
         let key_dir = key_dir()?;
         let key_path = format!("{}/{}", &key_dir, &name);
@@ -86,11 +85,10 @@ pub fn connect_to_server_args<'a>(
 pub fn connect_to_server(
     name: &str,
     address: &str,
-    auth_type: &str,
     default_key: bool,
     additional_args: &Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> { 
-    let ssh_args = connect_to_server_args(&name, &address, &auth_type, default_key, &additional_args)?;
+    let ssh_args = connect_to_server_args(&name, &address, default_key, &additional_args)?;
     Command::new("ssh")
         .args(ssh_args)
         .status()?;
@@ -126,11 +124,10 @@ pub fn connect_to_server_container(
     container_address: &str,
     server_name: &str,
     server_address: &str,
-    server_auth_type: &str,
     server_default_key: bool,
     additional_args: Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ssh_args = connect_to_server_args(&server_name, &server_address, &server_auth_type, server_default_key, &additional_args)?;
+    let ssh_args = connect_to_server_args(&server_name, &server_address, server_default_key, &additional_args)?;
     let docker_command = format!("docker exec -it {container_address}");
 
     let shells = vec!["bash", "ash", "sh"];
@@ -152,11 +149,12 @@ pub fn connect_to_server_container(
 }
 
 
-pub fn multi_selection() -> Result <Vec<String>, Box<dyn std::error::Error>> { 
+pub fn multi_selection(title: &str) -> Result <Vec<String>, Box<dyn std::error::Error>> { 
     // start fzf
     let file = File::open(&tmp_list_file())?;
     let output = Command::new("fzf")
         .arg("--multi")
+        .arg(&format!("--header={title}"))
         .stdin(Stdio::from(file))
         .output()?;
 
@@ -169,10 +167,11 @@ pub fn multi_selection() -> Result <Vec<String>, Box<dyn std::error::Error>> {
     Ok(selections)
 }
 
-pub fn selection() -> Result <String, Box<dyn std::error::Error>> { 
+pub fn selection(title: &str) -> Result <String, Box<dyn std::error::Error>> { 
     // start fzf
     let file = File::open(&tmp_list_file())?;
     let output = Command::new("fzf")
+        .arg(&format!("--header={title}"))
         .stdin(Stdio::from(file))
         .output()?;
 
@@ -190,7 +189,7 @@ pub fn db_array_placeholders(data_length: usize) -> String {
         .join(",")
 }
 
-pub async fn select_nodes() -> Result <String, Box<dyn std::error::Error>> {
+pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Error>> {
     let mut file = File::create(&tmp_list_file())?;
 
     // get local active container
@@ -221,12 +220,12 @@ pub async fn select_nodes() -> Result <String, Box<dyn std::error::Error>> {
         writeln!(file, "{node_type_caption}: {name}")?;
     }
 
-    let selected = selection()?;
+    let selected = selection(&title)?;
 
     Ok(selected)
 }
 
-pub async fn select_server() -> Result <String, Box<dyn std::error::Error>> {
+pub async fn select_server(title: &str) -> Result <String, Box<dyn std::error::Error>> {
     let mut file = File::create(&tmp_list_file())?;
     let pool = get_db_pool().await?;
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
@@ -241,12 +240,12 @@ pub async fn select_server() -> Result <String, Box<dyn std::error::Error>> {
         writeln!(file, "{node_type_caption}: {name}")?;
     }
 
-    let selected = selection()?;
+    let selected = selection(&title)?;
 
     Ok(selected)
 }
 
-pub async fn select_multi_server() -> Result <Vec<String>, Box<dyn std::error::Error>> {
+pub async fn select_multi_server(title: &str) -> Result <Vec<String>, Box<dyn std::error::Error>> {
     let mut file = File::create(&tmp_list_file())?;
     let pool = get_db_pool().await?;
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
@@ -261,7 +260,7 @@ pub async fn select_multi_server() -> Result <Vec<String>, Box<dyn std::error::E
         writeln!(file, "{node_type_caption}: {name}")?;
     }
 
-    let selections = multi_selection()?;
+    let selections = multi_selection(&title)?;
 
     Ok(selections)
 }

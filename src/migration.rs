@@ -30,6 +30,16 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&mut *tx)
         .await?;
     }
+    
+    // delete auth type from nodes
+    if column_exists("nodes", "auth_type").await? {
+        sqlx::query(r#"
+            ALTER TABLE nodes DROP COLUMN auth_type;
+            "#,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
 
     tx.commit().await?;
     
