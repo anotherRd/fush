@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 use std::fs::File;
 use crate::database::get_db_pool;
 use sqlx::Row;
+use std::fs;
 
 pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>) -> Result<String, Box<dyn std::error::Error>> {
     let mut input = String::new();
@@ -47,9 +48,8 @@ pub fn split_selected(selected: &str) -> (String, String) {
 }
 
 pub fn connect_to_server_args<'a>(
-    name: &'a str,
+    key: &'a Option<&'a str>,
     address: &'a str,
-    default_key: bool,
     additional_args: &Vec<&'a str>
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> { 
     // split address and port
@@ -65,12 +65,10 @@ pub fn connect_to_server_args<'a>(
     ];
 
     // check if using key or password
-    if !default_key {
-        // check key exists
-        let key_dir = key_dir()?;
-        let key_path = format!("{}/{}", &key_dir, &name);
-        let pub_key_path = format!("{}/{}.pub", &key_dir, &name);
-        if Path::new(&key_path).exists() && Path::new(&pub_key_path).exists() {
+    if let Some(key) = &key {
+        if key_pair_exists(&key)? {
+            let key_dir = key_dir()?;
+            let key_path = format!("{}/{}", &key_dir, &key);
             ssh_args.extend(["-i".to_string(), key_path.to_string()]);
         }
     }
@@ -83,12 +81,11 @@ pub fn connect_to_server_args<'a>(
 }
 
 pub fn connect_to_server(
-    name: &str,
+    key: &Option<&str>,
     address: &str,
-    default_key: bool,
     additional_args: &Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> { 
-    let ssh_args = connect_to_server_args(&name, &address, default_key, &additional_args)?;
+    let ssh_args = connect_to_server_args(&key, &address, &additional_args)?;
     Command::new("ssh")
         .args(ssh_args)
         .status()?;
@@ -122,12 +119,11 @@ pub fn connect_to_container(
 
 pub fn connect_to_server_container(
     container_address: &str,
-    server_name: &str,
+    server_key: &Option<&str>,
     server_address: &str,
-    server_default_key: bool,
     additional_args: Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ssh_args = connect_to_server_args(&server_name, &server_address, server_default_key, &additional_args)?;
+    let ssh_args = connect_to_server_args(&server_key, &server_address, &additional_args)?;
     let docker_command = format!("docker exec -it {container_address}");
 
     let shells = vec!["bash", "ash", "sh"];
@@ -263,4 +259,39 @@ pub async fn select_multi_server(title: &str) -> Result <Vec<String>, Box<dyn st
     let selections = multi_selection(&title)?;
 
     Ok(selections)
+}
+
+pub fn key_pair_exists(key: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    let key_dir = key_dir()?;
+    let key_path = format!("{}/{}", &key_dir, &key);
+    let pub_key_path = format!("{}/{}.pub", &key_dir, &key);
+    return Ok(Path::new(&key_path).exists() && Path::new(&pub_key_path).exists());
+}
+
+pub fn create_key_pair(key: &str, overwrite: bool) -> Result<bool, Box<dyn std::error::Error>> {
+    let key_dir = key_dir()?;
+    let key_path = format!("{}/{}", &key_dir, &key);
+    let pub_key_path = format!("{}/{}.pub", &key_dir, &key);
+
+    // if key pair exists and overwrite false return false
+    if key_pair_exists(&key)? && !overwrite {
+        return Ok(false);
+    }
+
+    // delete existing key if overwrite is true
+    if Path::new(&key_path).exists() {
+        fs::remove_file(&key_path)?;
+    }
+    
+    if Path::new(&pub_key_path).exists() {
+        fs::remove_file(&pub_key_path)?;
+    }
+
+    let key_location = format!("{}/{}", &key_dir, &key);
+        Command::new("ssh-keygen")
+            .args(["-f", &key_location])
+            .output()?;
+
+    return Ok(true);
+
 }

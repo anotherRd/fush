@@ -31,10 +31,30 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     }
     
-    // delete auth type from nodes
+    // drop auth type from nodes
     if column_exists("nodes", "auth_type").await? {
         sqlx::query(r#"
             ALTER TABLE nodes DROP COLUMN auth_type;
+            "#,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    // drop default key to nodes
+    if column_exists("nodes", "default_key").await? {
+        sqlx::query(r#"
+            ALTER TABLE nodes DROP COLUMN default_key;
+            "#,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+    
+    // add default key to nodes
+    if !column_exists("nodes", "key").await? {
+        sqlx::query(r#"
+            ALTER TABLE nodes ADD COLUMN key TEXT;
             "#,
         )
         .execute(&mut *tx)
