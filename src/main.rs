@@ -87,10 +87,29 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
 
     // generate key for this node
     if generate_key == "y" {
-        let key_location = format!("{}/{}", &key_dir()?, name);
-        Command::new("ssh-keygen")
-            .args(["-f", &key_location])
-            .output()?;
+        let key_dir = key_dir()?;
+        let mut overwrite_key = true;
+
+        // check if key exists and overwrite key confirmation
+        let key_path = format!("{}/{}", &key_dir, &name);
+        let pub_key_path = format!("{}/{}.pub", &key_dir, &name);
+        if Path::new(&key_path).exists() && Path::new(&pub_key_path).exists() {
+            let overwrite_key_confirmation = read_from_input(&format!("Key already exsits, overwrite the key? [y/n]?"), None, vec!["y", "n"])?;
+            if overwrite_key_confirmation == "n" {
+                overwrite_key = false;
+            } else {
+                // delete existing keys
+                fs::remove_file(&key_path)?;
+                fs::remove_file(&pub_key_path)?;
+            }
+        }
+
+        if overwrite_key {
+            let key_location = format!("{}/{}", &key_dir, name);
+            Command::new("ssh-keygen")
+                .args(["-f", &key_location])
+                .output()?;
+        }
     }
 
     tx.commit().await?;
