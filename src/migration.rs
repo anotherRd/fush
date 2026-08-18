@@ -1,4 +1,5 @@
 use crate::database::get_db_pool;
+use sqlx::Row;
 
 pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
@@ -19,8 +20,37 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
     )
     .execute(&mut *tx)
     .await?;
+    
+    // add default key to nodes
+    if !column_exists("nodes", "default_key").await? {
+        sqlx::query(r#"
+            ALTER TABLE nodes ADD COLUMN default_key BOOL;
+            "#,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
 
     tx.commit().await?;
     
     Ok(())
+}
+
+pub async fn column_exists(table: &str, column: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    let pool = get_db_pool().await?;
+    let row = sqlx::query(r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM pragma_table_info(?)
+            WHERE name = ?
+        )
+        "#,
+    )
+    .bind(&table)
+    .bind(&column)
+    .fetch_one(&pool)
+    .await?;
+
+    let exists: bool = row.get(0);
+    Ok(exists)
 }

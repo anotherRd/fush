@@ -44,11 +44,15 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_type;
     let mut generate_key = "n".to_string();
+    let mut default_key = false;
     match auth_type_choice.as_str() {
         // key
         "k" => {
             auth_type = "key";
             generate_key = read_from_input("Generate new key (use default key if no) [y/n]?", None, vec!["y", "n"])?;
+            if generate_key == "n" {
+                default_key = true;
+            }
         },
         // password
         "p" => {
@@ -70,9 +74,11 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
                 name,
                 address,
                 node_type,
-                auth_type
+                auth_type,
+                default_key
             ) VALUES (
                 ?, 
+                ?,
                 ?,
                 ?,
                 ?
@@ -82,6 +88,7 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
         .bind(&address)
         .bind("server")
         .bind(&auth_type)
+        .bind(&default_key)
         .execute(&mut *tx)
         .await?;
 
@@ -264,9 +271,10 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
             let name: String = row.get("name");
             let address: String = row.get("address");
             let auth_type: String = row.get("auth_type");
+            let default_key: bool = row.get("default_key");
             
             // execute ssh
-            connect_to_server(&name, &address, &auth_type, &vec![])?;
+            connect_to_server(&name, &address, &auth_type, default_key, &vec![])?;
         },
         "server container" => {
             // get from database
@@ -288,9 +296,10 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
             let server_name: String = row.get("server_name");
             let server_address: String = row.get("server_address");
             let server_auth_type: String = row.get("server_auth_type");
+            let server_default_key: bool = row.get("server_default_key");
             
             // execute ssh
-            connect_to_server_container(&container_address, &server_name, &server_address, &server_auth_type, vec!["-t"])?;
+            connect_to_server_container(&container_address, &server_name, &server_address, &server_auth_type, server_default_key, vec!["-t"])?;
         },
         _ => ()
     }
@@ -352,11 +361,12 @@ async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
         let name: String = row.get("name");
         let auth_type: String = row.get("auth_type");
         let address: String = row.get("address");
+        let default_key: bool = row.get("default_key");
 
         println!("Scanning container on : {name}");
         
         // ssh args
-        let mut ssh_args = connect_to_server_args(&name, &address, &auth_type, &vec![])?;
+        let mut ssh_args = connect_to_server_args(&name, &address, &auth_type, default_key, &vec![])?;
         ssh_args.extend(["-t".to_string(), "docker ps --format {{.Names}}".to_string()]);
 
         // execute ssh

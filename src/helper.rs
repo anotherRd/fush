@@ -48,6 +48,7 @@ pub fn connect_to_server_args<'a>(
     name: &'a str,
     address: &'a str,
     auth_type: &'a str,
+    default_key: bool,
     additional_args: &Vec<&'a str>
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> { 
     // split address and port
@@ -63,7 +64,7 @@ pub fn connect_to_server_args<'a>(
     ];
 
     // check if using key or password
-    if auth_type == "key" {
+    if auth_type == "key" && !default_key {
         // check key exists
         let key_dir = key_dir()?;
         let key_path = format!("{}/{}", &key_dir, &name);
@@ -84,9 +85,10 @@ pub fn connect_to_server(
     name: &str,
     address: &str,
     auth_type: &str,
+    default_key: bool,
     additional_args: &Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> { 
-    let ssh_args = connect_to_server_args(&name, &address, &auth_type, &additional_args)?;
+    let ssh_args = connect_to_server_args(&name, &address, &auth_type, default_key, &additional_args)?;
     Command::new("ssh")
         .args(ssh_args)
         .status()?;
@@ -123,9 +125,10 @@ pub fn connect_to_server_container(
     server_name: &str,
     server_address: &str,
     server_auth_type: &str,
+    server_default_key: bool,
     additional_args: Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ssh_args = connect_to_server_args(&server_name, &server_address, &server_auth_type, &additional_args)?;
+    let ssh_args = connect_to_server_args(&server_name, &server_address, &server_auth_type, server_default_key, &additional_args)?;
     let docker_command = format!("docker exec -it {container_address}");
 
     let shells = vec!["bash", "ash", "sh"];
