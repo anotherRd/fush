@@ -12,7 +12,6 @@ use crate::migration::migrate;
 use crate::database::get_db_pool;
 use sqlx::{Row};
 use crate::config::{init_config};
-use std::path::Path;
 use std::fs;
 
 #[derive(Parser, Debug)]
@@ -23,13 +22,13 @@ struct Args {
     sync_all_server_container: bool,
     #[arg(short, long)]
     scyn_server_container: bool,
-    #[arg(short, long)]
+    #[arg(short, long, help = "Add new server")]
     new: bool,
-    #[arg(short, long)]
+    #[arg(short, long, help = "Delete server")]
     delete: bool,
-    #[arg(short, long)]
+    #[arg(short, long, help = "Edit server")]
     edit: bool,
-    #[arg(short, long)]
+    #[arg(short, long, help = "Show custom key path and content")]
     key: bool,
 }
 
