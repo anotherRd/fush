@@ -3,9 +3,9 @@ use sqlx::Row;
 
 pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
-    let mut tx = pool.begin().await?;
     
     // create nodes
+    let mut tx = pool.begin().await?;
     sqlx::query(r#"
         CREATE TABLE IF NOT EXISTS nodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,8 +20,10 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
     )
     .execute(&mut *tx)
     .await?;
+    tx.commit().await?;
     
     // add default key to nodes
+    let mut tx = pool.begin().await?;
     if !column_exists("nodes", "default_key").await? {
         sqlx::query(r#"
             ALTER TABLE nodes ADD COLUMN default_key BOOL;
@@ -30,8 +32,10 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&mut *tx)
         .await?;
     }
+    tx.commit().await?;
     
     // drop auth type from nodes
+    let mut tx = pool.begin().await?;
     if column_exists("nodes", "auth_type").await? {
         sqlx::query(r#"
             ALTER TABLE nodes DROP COLUMN auth_type;
@@ -40,8 +44,10 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&mut *tx)
         .await?;
     }
+    tx.commit().await?;
 
     // drop default key to nodes
+    let mut tx = pool.begin().await?;
     if column_exists("nodes", "default_key").await? {
         sqlx::query(r#"
             ALTER TABLE nodes DROP COLUMN default_key;
@@ -50,8 +56,10 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&mut *tx)
         .await?;
     }
+    tx.commit().await?;
     
     // add default key to nodes
+    let mut tx = pool.begin().await?;
     if !column_exists("nodes", "key").await? {
         sqlx::query(r#"
             ALTER TABLE nodes ADD COLUMN key TEXT;
@@ -60,7 +68,6 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&mut *tx)
         .await?;
     }
-
     tx.commit().await?;
     
     Ok(())

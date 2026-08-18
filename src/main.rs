@@ -6,7 +6,7 @@ pub mod config;
 use clap::{Parser, CommandFactory};
 use std::env;
 use std::process::{Command};
-use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, db_array_placeholders, connect_to_server_args, select_server, select_multi_server, select_nodes, create_key_pair};
+use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, db_array_placeholders, connect_to_server_args, select_server, select_multi_server, select_nodes, create_key_pair, key_pair_exists};
 use crate::config::{key_dir};
 use crate::migration::migrate;
 use crate::database::get_db_pool;
@@ -20,9 +20,9 @@ struct Args {
     #[arg(short, long)]
     connect: bool,
     #[arg(short='S', long)]
-    scan_all_server_container: bool,
+    sync_all_server_container: bool,
     #[arg(short, long)]
-    scan_server_container: bool,
+    scyn_server_container: bool,
     #[arg(short, long)]
     new: bool,
     #[arg(short, long)]
@@ -36,11 +36,11 @@ struct Args {
 async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
     // read user input
     println!("Create new server");
-    let name = read_from_input("Name", None, vec![])?;
-    let user = read_from_input("User", None, vec![])?;
-    let host = read_from_input("Host", None, vec![])?;
-    let port = read_from_input("Port (22)", Some("22"), vec![])?;
-    let key_input = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![])?;
+    let name = read_from_input("Name", None, vec![], true)?;
+    let user = read_from_input("User", None, vec![], true)?;
+    let host = read_from_input("Host", None, vec![], true)?;
+    let port = read_from_input("Port (22)", Some("22"), vec![], true)?;
+    let key_input = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
     let key = if key_input == "" { None } else { Some(key_input) };
 
     let port = if port == "" { "22" } else { &port };
@@ -69,103 +69,96 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&mut *tx)
         .await?;
 
-    // generate key for this node
+    // generate key
     if let Some(key_value) = &key {
         if !create_key_pair(&key_value, false)? {
             println!("INFO use existing key: {key_value}");
+        } else {
+            println!("INFO created key: {key_value}");
         }
     }
 
     tx.commit().await?;
-    println!("INFO server {name} created");
+    println!("INFO server created: {name}");
 
     Ok(())
 }
 
 async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
-    // let pool = get_db_pool().await?;
-    // let mut tx = pool.begin().await?;
+    let pool = get_db_pool().await?;
+    let mut tx = pool.begin().await?;
     
-    // // start selection
-    // let selected = select_server("Select server to edit").await?;
-    // if selected == "" {
-    //     return Ok(());
-    // }
+    // start selection
+    let selected = select_server("Select server to edit").await?;
+    if selected == "" {
+        return Ok(());
+    }
     
-    // // format selected
-    // let (_prefix, selected_name) = split_selected(&selected);
+    // format selected
+    let (_prefix, selected_name) = split_selected(&selected);
 
-    // // get detail
-    // let row = sqlx::query("SELECT * FROM nodes WHERE name = ?")
-    //     .bind(&selected_name)
-    //     .fetch_one(&pool)
-    //     .await?;
+    // get detail
+    let row = sqlx::query("SELECT * FROM nodes WHERE name = ?")
+        .bind(&selected_name)
+        .fetch_one(&pool)
+        .await?;
 
-    // let old_id: i64 = row.get("id");
-    // let old_name: String = row.get("name");
-    // let old_node_type: String = row.get("node_type");
-    // let old_address: String = row.get("address");
+    let old_id: i64 = row.get("id");
+    let old_name: String = row.get("name");
+    let old_key: Option<String> = row.get("key");
+    let old_node_type: String = row.get("node_type");
+    let old_address: String = row.get("address");
 
-    // // split address
-    // let (old_user, rest) = old_address.split_once('@').unwrap();
-    // let (old_host, old_port) = rest.split_once(':').unwrap();
+    // split address
+    let (old_user, rest) = old_address.split_once('@').unwrap();
+    let (old_host, old_port) = rest.split_once(':').unwrap();
 
-    // // read user input
-    // println!("Edit server: {selected_name}");
-    // let name = read_from_input(&format!("Name ({old_name})"), Some(&old_name), vec![])?;
-    // let user = read_from_input(&format!("User ({old_user})"), Some(&old_user), vec![])?;
-    // let host = read_from_input(&format!("Host ({old_host})"), Some(&old_host), vec![])?;
-    // let port = read_from_input(&format!("Port ({old_port})"), Some(&old_port), vec![])?;
+    // read user input
+    println!("Edit server: {selected_name}");
+    let name = read_from_input(&format!("Name ({old_name})"), Some(&old_name), vec![], true)?;
+    let user = read_from_input(&format!("User ({old_user})"), Some(&old_user), vec![], true)?;
+    let host = read_from_input(&format!("Host ({old_host})"), Some(&old_host), vec![], true)?;
+    let port = read_from_input(&format!("Port ({old_port})"), Some(&old_port), vec![], true)?;
+    let change_key = read_from_input(&format!("Change key ({}) [y/n]?", old_key.as_ref().unwrap()), None, vec!["y", "n"], true)?;
 
-    // let generate_key;
-    // if key_found {
-    //     generate_key = read_from_input("Found existing key, regenerate [y/n/(d)efault key or password]?", None, vec!["y", "n", "d"])?;
-    // } else {
-    //     generate_key = read_from_input("Generate new key (use default key/password if no) [y/n]?", None, vec!["y", "n"])?;
-    // }
-    
-    // let default_key = generate_key == "n" || generate_key == "d";
-    // let address = format!("{user}@{host}:{port}");
+    let key;
+    if change_key == "y" {
+        let key_input = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
+        key = if key_input == "" { None } else { Some(key_input) };
+    } else {
+        key = old_key;
+    }
 
-    // sqlx::query(
-    //         "UPDATE nodes
-    //             set name = ?,
-    //             set address = ?,
-    //             set node_type = ?,
-    //             set default_key = ?
-    //         WHERE id = ?"
-    //     )
-    //     .bind(&name)
-    //     .bind(&address)
-    //     .bind(&old_node_type)
-    //     .bind(&default_key)
-    //     .bind(&old_id)
-    //     .execute(&mut *tx)
-    //     .await?;
+    let port = if port == "" { "22" } else { &port };
+    let address = format!("{user}@{host}:{port}");
 
-    // // generate key for this node
-    // if generate_key == "y" {
-    //     let key_dir = key_dir()?;
+    sqlx::query(
+            "UPDATE nodes
+                set name = ?,
+                address = ?,
+                node_type = ?,
+                key = ?
+            WHERE id = ?"
+        )
+        .bind(&name)
+        .bind(&address)
+        .bind(&old_node_type)
+        .bind(&key)
+        .bind(&old_id)
+        .execute(&mut *tx)
+        .await?;
 
-    //     // delete existing key
-    //     let key_path = format!("{}/{}", &key_dir, &old_name);
-    //     let pub_key_path = format!("{}/{}.pub", &key_dir, &old_name);
-    //     if Path::new(&key_path).exists() { 
-    //         fs::remove_file(&key_path)?;
-    //     }
+    // generate key
+    if let Some(key_value) = &key {
+        if !create_key_pair(&key_value, false)? {
+            println!("INFO use existing key: {key_value}");
+        } else {
+            println!("INFO created key: {key_value}");
+        }
+    }
 
-    //     if Path::new(&pub_key_path).exists() {
-    //         fs::remove_file(&pub_key_path)?;
-    //     }
-
-    //     // create new key
-    //     let key_location = format!("{}/{}", &key_dir, name);
-    //     Command::new("ssh-keygen")
-    //         .args(["-f", &key_location])
-    //         .output()?;
-    // }
-
-    // tx.commit().await?;
+    tx.commit().await?;
+    println!("INFO server updated");
 
     Ok(())
 }
@@ -185,7 +178,7 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     // confirmation
     println!("To be deleted:");
     println!("{:?}", &selections);
-    let confirmation = read_from_input("Are you sure [y/n]?", None, vec!["y", "n"])?;
+    let confirmation = read_from_input("Are you sure [y/n]?", None, vec!["y", "n"], true)?;
     if confirmation == "n" {
         return Ok(());
     }
@@ -256,7 +249,7 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
             let row = sqlx::query("SELECT 
                     nodes.*,
                     server.key as server_key,
-                    server.address as server_address,
+                    server.address as server_address
                     FROM nodes
                     JOIN nodes AS server ON nodes.parent_id = server.id
                     WHERE nodes.name = ?
@@ -279,7 +272,7 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::Error>> {
+async fn scyn_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
     let rows;
@@ -358,10 +351,8 @@ async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
                         name,
                         address,
                         node_type,
-                        auth_type,
                         parent_id
                     ) VALUES (
-                        ?, 
                         ?,
                         ?,
                         ?,
@@ -371,7 +362,6 @@ async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
                 .bind(&node_name)
                 .bind(&container)
                 .bind("server_container")
-                .bind("container")
                 .bind(id)
                 .execute(&mut *tx)
                 .await?;
@@ -383,6 +373,8 @@ async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
 }
 
 async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
+    let pool = get_db_pool().await?;
+
     // start selection
     let selected = select_server("Select server to show key").await?;
 
@@ -392,16 +384,29 @@ async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Selected: {selected}");
-    let (_prefix, selected) = split_selected(&selected);
+    let (_prefix, selected_name) = split_selected(&selected);
 
-    let key_dir = key_dir()?;
-    let key_path = format!("{}/{}.pub", &key_dir, &selected);
-    if Path::new(&key_path).exists() {
-        let key_content = fs::read_to_string(&key_path)?;
-        println!("{key_content}");
+    // get detail
+    let row = sqlx::query("SELECT * FROM nodes WHERE name = ?")
+        .bind(&selected_name)
+        .fetch_one(&pool)
+        .await?;
+
+    let key: Option<&str> = row.get("key");
+    if let Some(key_value) = key {
+        if key_pair_exists(&key_value)? {
+            let key_dir = key_dir()?;
+            let key_path = format!("{}/{}.pub", &key_dir, &key_value);
+            let key_content = fs::read_to_string(&key_path)?;
+            println!("Key path: {key_path}");
+            println!("{key_content}");
+        } else {
+            eprintln!("ERROR Key {key_value} not found");
+        }
     } else {
-        eprintln!("Key not found for: {selected}");
+        println!("Use default keys");
     }
+
 
     Ok(())
 }
@@ -430,10 +435,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         edit_node().await?;
     } else if args.delete {
         delete_node().await?;
-    } else if args.scan_all_server_container {
-        scan_server_container(true).await?;
-    } else if args.scan_server_container {
-        scan_server_container(false).await?;
+    } else if args.sync_all_server_container {
+        scyn_server_container(true).await?;
+    } else if args.scyn_server_container {
+        scyn_server_container(false).await?;
     } else if args.key {
         show_key().await?;
     }

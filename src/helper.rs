@@ -7,11 +7,13 @@ use crate::database::get_db_pool;
 use sqlx::Row;
 use std::fs;
 
-pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>) -> Result<String, Box<dyn std::error::Error>> {
+pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>, required: bool) -> Result<String, Box<dyn std::error::Error>> {
     let mut input = String::new();
     let mut trimmed_input = "";
+    let mut continue_loop = true;
 
-    while trimmed_input == "" {
+    while continue_loop {
+        continue_loop = false;
         // read from input
         print!("{caption}: ");
         io::stdout().flush()?;
@@ -24,15 +26,16 @@ pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>)
             // set to default if available
             if let Some(default_value) = default {
                 trimmed_input = default_value;
-            } else {
+            } else if required{
                 println!("{caption} is required");
+                continue_loop = true;
             }
         } else if choices.len() > 0 {
             // if choices available
             if !choices.contains(&trimmed_input) {
                 let choice_values = choices.join("/");
                 println!("{caption} value must be [{choice_values}]");
-                trimmed_input = "";
+                continue_loop = true;
             }
         }
     }
@@ -58,7 +61,7 @@ pub fn connect_to_server_args<'a>(
     // ssh args
     let mut ssh_args = vec![
         "-o".to_string(),
-        "ConnectTimeout=10".to_string(),
+        "ConnectTimeout=5".to_string(),
         address[0].to_string(),
         "-p".to_string(),
         address[1].to_string()
