@@ -99,12 +99,16 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
+    let key_dir = key_dir()?;
+
+    let mut to_be_deleted_keys: Vec<String> = Vec::new();
+    let mut delete_all_keys = false;
     let mut file = File::create(&tmp_list_file())?;
 
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
 
-    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server' or node_type = 'server_container'")
+    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
         .fetch_all(&pool)
         .await?;
 
@@ -132,8 +136,29 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     // format selected raw 
     let mut selected_names = Vec::new();
     for selected in selections {
-        let (_prefix, selected) = split_selected(&selected);
-        selected_names.push(selected);
+        let (_prefix, selected_name) = split_selected(&selected);
+        
+        // check if key exists and delete key confirmation
+        let key_path = format!("{}/{}", &key_dir, &selected_name);
+        let pub_key_path = format!("{}/{}.pub", &key_dir, &selected_name);
+        if Path::new(&key_path).exists() || Path::new(&pub_key_path).exists() {
+            if !delete_all_keys {
+                let delete_key_confirmation = read_from_input(&format!("Delete key for {selected_name} [(a)ll/y/n]?"), None, vec!["a", "y", "n"])?;
+                if delete_key_confirmation == "a" {
+                    delete_all_keys = true;
+                }
+                
+                // store for deletion
+                if delete_key_confirmation == "y" || delete_key_confirmation == "a" {
+                    to_be_deleted_keys.extend([key_path.clone(), pub_key_path.clone()]);
+                }
+            } else {
+                to_be_deleted_keys.extend([key_path.clone(), pub_key_path.clone()]);
+            }
+
+        }
+        
+        selected_names.push(selected_name);
     }
 
     // delete from db
@@ -150,6 +175,13 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     q.execute(&mut *tx).await?;
 
     tx.commit().await?;
+
+    // delete keys
+    for key in to_be_deleted_keys {
+        if Path::new(&key).exists() {
+            let _ = fs::remove_file(&key);
+        }
+    }
     
     Ok(())
 }
