@@ -15,6 +15,7 @@ use std::fs::File;
 use sqlx::{Row};
 use crate::config::{init_config};
 use std::path::Path;
+use std::fs;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -28,6 +29,8 @@ struct Args {
     delete: bool,
     #[arg(short, long)]
     edit: bool,
+    #[arg(short, long)]
+    key: bool,
 }
 
 async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,6 +61,8 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
     let address = format!("{user}@{host}:{port}");
 
     let pool = get_db_pool().await?;
+    let mut tx = pool.begin().await?;
+
     sqlx::query(
             "INSERT INTO nodes (
                 name,
@@ -75,7 +80,7 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
         .bind(&address)
         .bind("server")
         .bind(&auth_type)
-        .execute(&pool)
+        .execute(&mut *tx)
         .await?;
 
     // generate key for this node
@@ -86,6 +91,8 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
             .output()?;
     }
 
+    tx.commit().await?;
+
     Ok(())
 }
 
@@ -93,6 +100,8 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = File::create(&tmp_list_file())?;
 
     let pool = get_db_pool().await?;
+    let mut tx = pool.begin().await?;
+
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server' or node_type = 'server_container'")
         .fetch_all(&pool)
         .await?;
@@ -126,7 +135,7 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     // format selected raw 
     let mut selected_names = Vec::new();
     for selected in selections {
-        let (prefix, selected) = split_selected(&selected);
+        let (_prefix, selected) = split_selected(&selected);
         selected_names.push(selected);
     }
 
@@ -146,7 +155,9 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     for selected_name in &selected_names {
         q = q.bind(selected_name);
     }
-    q.execute(&pool).await?;
+    q.execute(&mut *tx).await?;
+
+    tx.commit().await?;
     
     Ok(())
 }
@@ -237,13 +248,12 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
                 .await?;
             
             // split address and port
-            let container_name: String = row.get("name");
             let container_address: String = row.get("address");
             let server_name: String = row.get("server_name");
             let server_address: String = row.get("server_address");
             
             // execute ssh
-            connect_to_server_container(&container_name, &container_address, &server_name, &server_address, vec!["-t"])?;
+            connect_to_server_container(&container_address, &server_name, &server_address, vec!["-t"])?;
         },
         _ => ()
     }
@@ -253,8 +263,8 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
 
 async fn scan_server_container()-> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
-
     let mut tx = pool.begin().await?;
+
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
         .fetch_all(&pool)
         .await?;
@@ -327,6 +337,53 @@ async fn scan_server_container()-> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
+    let mut file = File::create(&tmp_list_file())?;
+
+    // get from db
+    let pool = get_db_pool().await?;
+    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
+        .fetch_all(&pool)
+        .await?;
+
+    // write to tmp file
+    for row in rows {
+        let name: String = row.get("name");
+        let node_type: String = row.get("node_type");
+        let node_type_caption = node_type.replace("_", " ");
+        writeln!(file, "{node_type_caption}: {name}")?;
+    }
+
+    // start fzf
+    let file = File::open(&tmp_list_file())?;
+    let output = Command::new("fzf")
+        .stdin(Stdio::from(file))
+        .output()?;
+
+    let selected = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_string();
+
+    // return if nothing is selected
+    if selected == "" {
+        return Ok(())
+    }
+
+    println!("Selected: {selected}");
+    let (_prefix, selected) = split_selected(&selected);
+
+    let key_dir = key_dir()?;
+    let key_path = format!("{}/{}.pub", &key_dir, &selected);
+    if Path::new(&key_path).exists() {
+        let key_content = fs::read_to_string(&key_path)?;
+        println!("{key_content}");
+    } else {
+        println!("Key not found for: {selected}");
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // init config
@@ -351,6 +408,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         delete_node().await?;
     } else if args.scan_server_container {
         scan_server_container().await?;
+    } else if args.key {
+        show_key().await?;
     }
 
     Ok(())

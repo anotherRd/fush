@@ -76,6 +76,8 @@ pub fn connect_to_server(
     let ssh_args = connect_to_server_args(&name, &address, &additional_args)?;
     Command::new("ssh")
         .args(ssh_args)
+        .arg("-o")
+        .arg("ConnectTimeout=10")
         .status()?;
     
     Ok(())
@@ -106,7 +108,6 @@ pub fn connect_to_container(
 }
 
 pub fn connect_to_server_container(
-    container_name: &str,
     container_address: &str,
     server_name: &str,
     server_address: &str,
@@ -117,7 +118,7 @@ pub fn connect_to_server_container(
 
     let shells = vec!["bash", "ash", "sh"];
     for shell in shells {
-        let mut tmp_docker_command = format!("{docker_command} {shell}");
+        let tmp_docker_command = format!("{docker_command} {shell}");
         let mut tmp_ssh_args = ssh_args.clone();
         tmp_ssh_args.push(tmp_docker_command);
         

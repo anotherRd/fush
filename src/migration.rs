@@ -2,6 +2,7 @@ use crate::database::get_db_pool;
 
 pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
+    let mut tx = pool.begin().await?;
     
     // create nodes
     sqlx::query(r#"
@@ -16,8 +17,10 @@ pub async fn migrate() -> Result<(), Box<dyn std::error::Error>> {
         )
         "#,
     )
-    .execute(&pool)
+    .execute(&mut *tx)
     .await?;
 
+    tx.commit().await?;
+    
     Ok(())
 }
