@@ -121,7 +121,7 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     let key_dir = key_dir()?;
 
     let mut to_be_deleted_keys: Vec<String> = Vec::new();
-    let mut delete_all_keys = false;
+    let mut delete_all_keys = "".to_string();
     let mut file = File::create(&tmp_list_file())?;
 
     let pool = get_db_pool().await?;
@@ -161,17 +161,17 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
         let key_path = format!("{}/{}", &key_dir, &selected_name);
         let pub_key_path = format!("{}/{}.pub", &key_dir, &selected_name);
         if Path::new(&key_path).exists() || Path::new(&pub_key_path).exists() {
-            if !delete_all_keys {
-                let delete_key_confirmation = read_from_input(&format!("Delete key for {selected_name} [(a)ll/y/n]?"), None, vec!["a", "y", "n"])?;
-                if delete_key_confirmation == "a" {
-                    delete_all_keys = true;
+            if delete_all_keys == "" {
+                let delete_key_confirmation = read_from_input(&format!("Delete key for {selected_name} [ya/y/n/na]?"), None, vec!["ya", "y", "na"])?;
+                if delete_key_confirmation == "ya" || delete_key_confirmation == "na" {
+                    delete_all_keys = delete_key_confirmation.clone();
                 }
                 
                 // store for deletion
-                if delete_key_confirmation == "y" || delete_key_confirmation == "a" {
+                if delete_key_confirmation == "y" || delete_key_confirmation == "ya" {
                     to_be_deleted_keys.extend([key_path.clone(), pub_key_path.clone()]);
                 }
-            } else {
+            } else if delete_all_keys == "ya" {
                 to_be_deleted_keys.extend([key_path.clone(), pub_key_path.clone()]);
             }
 
