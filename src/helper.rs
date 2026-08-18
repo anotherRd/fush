@@ -1,7 +1,8 @@
 use std::io::{self, Write};
-use crate::config::key_dir;
+use crate::config::{key_dir, tmp_list_file};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::fs::File;
 
 pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>) -> Result<String, Box<dyn std::error::Error>> {
     let mut input = String::new();
@@ -53,7 +54,13 @@ pub fn connect_to_server_args<'a>(
     let address: Vec<&str> = address.split(":").collect();
 
     // ssh args
-    let mut ssh_args = vec![address[0].to_string(), "-p".to_string(), address[1].to_string()];
+    let mut ssh_args = vec![
+        "-o".to_string(),
+        "ConnectTimeout=10".to_string(),
+        address[0].to_string(),
+        "-p".to_string(),
+        address[1].to_string()
+    ];
 
     // check if using key or password
     if auth_type == "key" {
@@ -82,8 +89,6 @@ pub fn connect_to_server(
     let ssh_args = connect_to_server_args(&name, &address, &auth_type, &additional_args)?;
     Command::new("ssh")
         .args(ssh_args)
-        .arg("-o")
-        .arg("ConnectTimeout=10")
         .status()?;
     
     Ok(())
@@ -139,4 +144,43 @@ pub fn connect_to_server_container(
     }
 
     Ok(())
+}
+
+
+pub fn multi_selection() -> Result <Vec<String>, Box<dyn std::error::Error>> { 
+    // start fzf
+    let file = File::open(&tmp_list_file())?;
+    let output = Command::new("fzf")
+        .arg("--multi")
+        .stdin(Stdio::from(file))
+        .output()?;
+
+    // get selection to vec
+    let selections: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(String::from)
+        .collect();
+
+    Ok(selections)
+}
+
+pub fn selection() -> Result <String, Box<dyn std::error::Error>> { 
+    // start fzf
+    let file = File::open(&tmp_list_file())?;
+    let output = Command::new("fzf")
+        .stdin(Stdio::from(file))
+        .output()?;
+
+    let selected = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_string();
+
+    Ok(selected)
+}
+
+pub fn db_array_placeholders(data_length: usize) -> String {
+    std::iter::repeat("?")
+        .take(data_length)
+        .collect::<Vec<_>>()
+        .join(",")
 }

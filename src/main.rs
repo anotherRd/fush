@@ -5,8 +5,8 @@ pub mod config;
 
 use clap::{Parser, CommandFactory};
 use std::env;
-use std::process::{Command, Stdio};
-use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container};
+use std::process::{Command};
+use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, multi_selection, db_array_placeholders, selection, connect_to_server_args};
 use crate::config::{tmp_list_file, key_dir};
 use crate::migration::migrate;
 use crate::database::get_db_pool;
@@ -21,6 +21,8 @@ use std::fs;
 struct Args {
     #[arg(short, long)]
     connect: bool,
+    #[arg(short='S', long)]
+    scan_all_server_container: bool,
     #[arg(short, long)]
     scan_server_container: bool,
     #[arg(short, long)]
@@ -111,18 +113,13 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
         writeln!(file, "server: {name}")?;
     }
 
-    // start fzf
-    let file = File::open(&tmp_list_file())?;
-    let output = Command::new("fzf")
-        .arg("--multi")
-        .stdin(Stdio::from(file))
-        .output()?;
+    // start multi selection
+    let selections = multi_selection()?;
 
-    // get selection to vec
-    let selections: Vec<String> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(String::from)
-        .collect();
+    // if nothing is selected
+    if selections.len() == 0 {
+        return Ok(());
+    }
 
     // confirmation
     println!("To be deleted:");
@@ -140,14 +137,9 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // delete from db
-    let placeholders = std::iter::repeat("?")
-        .take(selected_names.len())
-        .collect::<Vec<_>>()
-        .join(",");
-
     let query = format!(
         "DELETE FROM nodes WHERE name IN ({})",
-        placeholders
+        &db_array_placeholders(selected_names.len())
     );
 
     // bind actual data
@@ -195,15 +187,8 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
         writeln!(file, "{node_type_caption}: {name}")?;
     }
 
-    // start fzf
-    let file = File::open(&tmp_list_file())?;
-    let output = Command::new("fzf")
-        .stdin(Stdio::from(file))
-        .output()?;
-
-    let selected = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .to_string();
+    // start selection
+    let selected = selection()?;
 
     // return if nothing is selected
     if selected == "" {
@@ -264,31 +249,66 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn scan_server_container()-> Result<(), Box<dyn std::error::Error>> {
+async fn scan_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
 
-    let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
+    let mut rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
         .fetch_all(&pool)
         .await?;
+
+    // select nodes if scan all is false
+    if !scan_all {
+        let mut file = File::create(&tmp_list_file())?;
+        // write to tmp file
+        for row in rows {
+            let name: String = row.get("name");
+            let node_type: String = row.get("node_type");
+            let node_type_caption = node_type.replace("_", " ");
+            writeln!(file, "{node_type_caption}: {name}")?;
+        }
+
+        // start multi selection
+        let selections = multi_selection()?;
+
+        // if nothing is selected
+        if selections.len() == 0 {
+            return Ok(());
+        }
+
+        // format selected raw 
+        let mut selected_names = Vec::new();
+        for selected in selections {
+            let (_prefix, selected) = split_selected(&selected);
+            selected_names.push(selected);
+        }
+
+        // get selected data
+        let query = format!(
+            "SELECT * FROM nodes WHERE node_type = 'server' and name IN ({})",
+            &db_array_placeholders(selected_names.len())
+        );
+
+        // bind actual data
+        let mut q = sqlx::query(&query);
+        for selected_name in &selected_names {
+            q = q.bind(selected_name);
+        }
+        rows = q.fetch_all(&mut *tx).await?;
+    }
 
     // write to tmp file
     for row in rows {
         let id: i64 = row.get("id");
         let name: String = row.get("name");
+        let auth_type: String = row.get("auth_type");
         let address: String = row.get("address");
-        let address: Vec<&str> = address.split(":").collect();
+
+        println!("Scanning container on : {name}");
         
         // ssh args
-        let mut ssh_args = vec![&address[0], "-p", &address[1]];
-
-        // check if theres keys
-        let key_dir = key_dir()?;
-        let key_path = format!("{}/{}", &key_dir, &name);
-        if Path::new(&key_path).exists() {
-            ssh_args.extend(["-i", &key_path]);
-        }
-        ssh_args.extend(["-t", "docker ps --format {{.Names}}"]);
+        let mut ssh_args = connect_to_server_args(&name, &address, &auth_type, &vec![])?;
+        ssh_args.extend(["-t".to_string(), "docker ps --format {{.Names}}".to_string()]);
 
         // execute ssh
         let output = Command::new("ssh")
@@ -357,15 +377,8 @@ async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
         writeln!(file, "{node_type_caption}: {name}")?;
     }
 
-    // start fzf
-    let file = File::open(&tmp_list_file())?;
-    let output = Command::new("fzf")
-        .stdin(Stdio::from(file))
-        .output()?;
-
-    let selected = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .to_string();
+    // start selection
+    let selected = selection()?;
 
     // return if nothing is selected
     if selected == "" {
@@ -409,8 +422,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         new_node().await?;
     } else if args.delete {
         delete_node().await?;
+    } else if args.scan_all_server_container {
+        scan_server_container(true).await?;
     } else if args.scan_server_container {
-        scan_server_container().await?;
+        scan_server_container(false).await?;
     } else if args.key {
         show_key().await?;
     }
