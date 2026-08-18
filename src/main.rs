@@ -229,16 +229,18 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
             // split address and port
             let name: String = row.get("name");
             let address: String = row.get("address");
+            let auth_type: String = row.get("auth_type");
             
             // execute ssh
-            connect_to_server(&name, &address, &vec![])?;
+            connect_to_server(&name, &address, &auth_type, &vec![])?;
         },
         "server container" => {
             // get from database
             let row = sqlx::query("SELECT 
                     nodes.*,
                     server.name as server_name,
-                    server.address as server_address
+                    server.address as server_address,
+                    server.auth_type as server_auth_type
                     FROM nodes
                     JOIN nodes AS server ON nodes.parent_id = server.id
                     WHERE nodes.name = ?
@@ -251,9 +253,10 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
             let container_address: String = row.get("address");
             let server_name: String = row.get("server_name");
             let server_address: String = row.get("server_address");
+            let server_auth_type: String = row.get("server_auth_type");
             
             // execute ssh
-            connect_to_server_container(&container_address, &server_name, &server_address, vec!["-t"])?;
+            connect_to_server_container(&container_address, &server_name, &server_address, &server_auth_type, vec!["-t"])?;
         },
         _ => ()
     }

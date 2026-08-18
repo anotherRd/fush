@@ -46,6 +46,7 @@ pub fn split_selected(selected: &str) -> (String, String) {
 pub fn connect_to_server_args<'a>(
     name: &'a str,
     address: &'a str,
+    auth_type: &'a str,
     additional_args: &Vec<&'a str>
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> { 
     // split address and port
@@ -54,11 +55,15 @@ pub fn connect_to_server_args<'a>(
     // ssh args
     let mut ssh_args = vec![address[0].to_string(), "-p".to_string(), address[1].to_string()];
 
-    // check if theres keys
-    let key_dir = key_dir()?;
-    let key_path = format!("{}/{}", &key_dir, &name);
-    if Path::new(&key_path).exists() {
-        ssh_args.extend(["-i".to_string(), key_path.to_string()]);
+    // check if using key or password
+    if auth_type == "key" {
+        // check key exists
+        let key_dir = key_dir()?;
+        let key_path = format!("{}/{}", &key_dir, &name);
+        let pub_key_path = format!("{}/{}.pub", &key_dir, &name);
+        if Path::new(&key_path).exists() && Path::new(&pub_key_path).exists() {
+            ssh_args.extend(["-i".to_string(), key_path.to_string()]);
+        }
     }
 
     for additional_arg in additional_args {
@@ -71,9 +76,10 @@ pub fn connect_to_server_args<'a>(
 pub fn connect_to_server(
     name: &str,
     address: &str,
+    auth_type: &str,
     additional_args: &Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> { 
-    let ssh_args = connect_to_server_args(&name, &address, &additional_args)?;
+    let ssh_args = connect_to_server_args(&name, &address, &auth_type, &additional_args)?;
     Command::new("ssh")
         .args(ssh_args)
         .arg("-o")
@@ -111,9 +117,10 @@ pub fn connect_to_server_container(
     container_address: &str,
     server_name: &str,
     server_address: &str,
+    server_auth_type: &str,
     additional_args: Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ssh_args = connect_to_server_args(&server_name, &server_address, &additional_args)?;
+    let ssh_args = connect_to_server_args(&server_name, &server_address, &server_auth_type, &additional_args)?;
     let docker_command = format!("docker exec -it {container_address}");
 
     let shells = vec!["bash", "ash", "sh"];
