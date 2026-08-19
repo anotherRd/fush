@@ -16,7 +16,8 @@ pub fn config_dir() -> Result<String, Box<dyn std::error::Error>> {
 }
 
 pub fn tmp_dir() -> String {
-    return format!("/tmp/{}", &app_name());
+    let tmp_dir = std::env::temp_dir().to_string_lossy().to_string();
+    return format!("/{}/{}", &tmp_dir, &app_name());
 }
 
 pub fn db_file() -> Result<String, Box<dyn std::error::Error>> {
