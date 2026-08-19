@@ -87,7 +87,7 @@ pub async fn add_server(params: AddServerServiceParams) -> Result<(), Box<dyn st
 
     // generate key
     if let Some(key_value) = &key {
-        if !create_key_pair(&key_value, false)? {
+        if !create_key_pair(&key_value, false, params.default_passphrase)? {
             custom_print("info", &format!("use existing key: {key_value}"));
         } else {
             custom_print("info", &format!("new key created: {key_value}"));
@@ -125,7 +125,7 @@ pub async fn edit_server(id: i64, params: EditServerServiceParams) -> Result<(),
 
     // generate key
     if let Some(key_value) = &key {
-        if !create_key_pair(&key_value, false)? {
+        if !create_key_pair(&key_value, false, params.default_passphrase)? {
             custom_print("info", &format!("use existing key: {key_value}"));
         } else {
             custom_print("info", &format!("new key created: {key_value}"));

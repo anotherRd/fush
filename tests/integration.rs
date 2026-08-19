@@ -136,6 +136,7 @@ async fn test_add_server_duplicate_name() {
         host: host.to_string(),
         port: port.to_string(),
         key: key.to_string(),
+        default_passphrase: None
     }).await.unwrap();
 
 
@@ -179,6 +180,7 @@ async fn test_edit_server() {
         host: host_before.to_string(),
         port: port_before.to_string(),
         key: key_before.to_string(),
+        default_passphrase: None
     }).await.unwrap();
 
 
@@ -252,6 +254,7 @@ async fn test_edit_server_unchanged() {
         host: host_before.to_string(),
         port: port_before.to_string(),
         key: key_before.to_string(),
+        default_passphrase: None
     }).await.unwrap();
 
 
@@ -312,6 +315,7 @@ async fn test_delete_server() {
         host: host.to_string(),
         port: port.to_string(),
         key: key.to_string(),
+        default_passphrase: None
     }).await.unwrap();
 
 
@@ -347,6 +351,7 @@ async fn test_delete_server_cancel() {
         host: host.to_string(),
         port: port.to_string(),
         key: key.to_string(),
+        default_passphrase: None
     }).await.unwrap();
 
 
@@ -356,6 +361,72 @@ async fn test_delete_server_cancel() {
 
     p.exp_string("Are you sure [y/n]?").unwrap();
     p.send_line("n").unwrap();
+    p.exp_eof().unwrap();
+
+    // check saved data
+    let saved_data = node_service::get_server_by_names(&name).await.unwrap();
+    assert_eq!(false, saved_data.is_empty());
+}
+
+#[tokio::test]
+async fn test_connect() {
+    setup().await;
+
+    let name = "connect_server";
+    let user = "user_connect_server";
+    let host = "192.168.1.1";
+    let port = "11";
+    let key = "connect_server_key";
+
+    // create server
+    node_service::add_server(AddServerServiceParams {
+        name: name.to_string(),
+        user: user.to_string(),
+        host: host.to_string(),
+        port: port.to_string(),
+        key: key.to_string(),
+        default_passphrase: Some("".to_string())
+    }).await.unwrap();
+
+    let key_dir = key_dir().unwrap();
+
+    // delete
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!("{binary} c \"server: {name}\""), Some(5_000)).unwrap();
+
+    p.exp_string(&format!("\"ssh\" \"-o\" \"ConnectTimeout=5\" \"{user}@{host}\" \"-p\" \"{port}\" \"-i\" \"{key_dir}/{key}\"")).unwrap();
+    p.exp_eof().unwrap();
+
+    // check saved data
+    let saved_data = node_service::get_server_by_names(&name).await.unwrap();
+    assert_eq!(false, saved_data.is_empty());
+}
+
+#[tokio::test]
+async fn test_connect_default_key() {
+    setup().await;
+
+    let name = "connect_server_default_key";
+    let user = "user_connect_server_default_key";
+    let host = "192.168.1.1";
+    let port = "11";
+    let key = "";
+
+    // create server
+    node_service::add_server(AddServerServiceParams {
+        name: name.to_string(),
+        user: user.to_string(),
+        host: host.to_string(),
+        port: port.to_string(),
+        key: key.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+
+    // delete
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!("{binary} c \"server: {name}\""), Some(5_000)).unwrap();
+
+    p.exp_string(&format!("\"ssh\" \"-o\" \"ConnectTimeout=5\" \"{user}@{host}\" \"-p\" \"{port}\"")).unwrap();
     p.exp_eof().unwrap();
 
     // check saved data

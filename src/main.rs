@@ -28,6 +28,7 @@ async fn add_server() -> Result<(), Box<dyn std::error::Error>> {
         host: host,
         port: port,
         key: key,
+        default_passphrase: None
     }).await?;
 
     Ok(())
@@ -71,6 +72,7 @@ async fn edit_server(selected: String) -> Result<(), Box<dyn std::error::Error>>
         host: host,
         port: port,
         key: key,
+        default_passphrase: None
     }).await?;
 
     Ok(())

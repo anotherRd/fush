@@ -3,7 +3,8 @@ pub struct AddServerServiceParams {
     pub user: String,
     pub host: String,
     pub port: String,
-    pub key: String
+    pub key: String,
+    pub default_passphrase: Option<String>
 }
 
 pub struct EditServerServiceParams {
@@ -11,5 +12,6 @@ pub struct EditServerServiceParams {
     pub user: String,
     pub host: String,
     pub port: String,
-    pub key: String
+    pub key: String,
+    pub default_passphrase: Option<String>
 }

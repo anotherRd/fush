@@ -119,10 +119,16 @@ pub fn connect_to_server(
     address: &str,
     additional_args: &Vec<&str>
 ) -> Result<(), Box<dyn std::error::Error>> { 
+    // prepare command
     let ssh_args = connect_to_server_args(&key, &address, &additional_args)?;
-    Command::new("ssh")
-        .args(ssh_args)
-        .status()?;
+    let mut cmd = Command::new("ssh");
+    cmd.args(&ssh_args);
+    
+    // print before executed
+    println!("{:?}", cmd);
+
+    // execute
+    cmd.status()?;
     
     Ok(())
 }
@@ -302,7 +308,7 @@ pub fn key_pair_exists(key: &str) -> Result<bool, Box<dyn std::error::Error>> {
     return Ok(Path::new(&key_path).exists() && Path::new(&pub_key_path).exists());
 }
 
-pub fn create_key_pair(key: &str, overwrite: bool) -> Result<bool, Box<dyn std::error::Error>> {
+pub fn create_key_pair(key: &str, overwrite: bool, default_passphrase: Option<String>) -> Result<bool, Box<dyn std::error::Error>> {
     let key_dir = key_dir()?;
     let key_path = format!("{}/{}", &key_dir, &key);
     let pub_key_path = format!("{}/{}.pub", &key_dir, &key);
@@ -322,9 +328,15 @@ pub fn create_key_pair(key: &str, overwrite: bool) -> Result<bool, Box<dyn std::
     }
 
     let key_location = format!("{}/{}", &key_dir, &key);
+    let mut keygen_args = vec!["-f", &key_location];
+    let passphare;
+    if let Some(default_passphrase_value) = default_passphrase {
+        passphare = default_passphrase_value.clone();
+        keygen_args.extend(["-N", &passphare]);
+    }
     Command::new("ssh-keygen")
         .env("SSH_ASKPASS_REQUIRE", "never")
-        .args(["-f", &key_location])
+        .args(keygen_args)
         .output()?;
 
     return Ok(true);
