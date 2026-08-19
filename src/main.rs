@@ -7,7 +7,7 @@ use fush::config::{key_dir};
 use fush::migration::migrate;
 use fush::database::get_db_pool;
 use fush::service::node_service;
-use fush::service_params::node_service_params::{EditNodeServiceParams, NewNodeServiceParams};
+use fush::service_params::node_service_params::{EditServerServiceParams, AddServerServiceParams};
 use sqlx::{Row};
 use fush::config::{init_config};
 use std::fs;
@@ -22,7 +22,7 @@ async fn add_server() -> Result<(), Box<dyn std::error::Error>> {
     let key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
     
     // save new node
-    node_service::add_server(NewNodeServiceParams {
+    node_service::add_server(AddServerServiceParams {
         name: name,
         user: user,
         host: host,
@@ -42,7 +42,7 @@ async fn edit_server(selected: String) -> Result<(), Box<dyn std::error::Error>>
     let (_prefix, selected_name) = split_selected(&selected);
 
     // get server
-    let node_dto = node_service::get_server_by_name(&selected_name).await?;
+    let node_dto = node_service::find_server_by_name(&selected_name).await?;
     let (old_user, old_host, old_port) = split_server_address(&node_dto.address);
 
     // read user input
@@ -65,7 +65,7 @@ async fn edit_server(selected: String) -> Result<(), Box<dyn std::error::Error>>
     }
 
     // save edit node
-    node_service::edit_server(node_dto.id, EditNodeServiceParams {
+    node_service::edit_server(node_dto.id, EditServerServiceParams {
         name: name,
         user: user,
         host: host,
@@ -108,16 +108,11 @@ async fn connect(selected: String)-> Result<(), Box<dyn std::error::Error>> {
     if selected == "" {
         return Ok(())
     }
-    let pool = get_db_pool().await?;
-
-    // start selection
-    let selected = select_nodes("Select node to connect").await?;
-
-
     custom_print("info", &format!("Selected: {selected}"));
     let (prefix, selected) = split_selected(&selected);
 
     // connect
+    let pool = get_db_pool().await?;
     match prefix.as_str() {
         "container" => {
             // execute docker exec

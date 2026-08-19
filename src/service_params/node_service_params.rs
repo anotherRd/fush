@@ -1,4 +1,4 @@
-pub struct NewNodeServiceParams {
+pub struct AddServerServiceParams {
     pub name: String,
     pub user: String,
     pub host: String,
@@ -6,7 +6,7 @@ pub struct NewNodeServiceParams {
     pub key: String
 }
 
-pub struct EditNodeServiceParams {
+pub struct EditServerServiceParams {
     pub name: String,
     pub user: String,
     pub host: String,

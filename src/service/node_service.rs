@@ -1,10 +1,10 @@
-use crate::{dto::node_dto::NodeDto, service_params::node_service_params::EditNodeServiceParams};
-use crate::service_params::node_service_params::NewNodeServiceParams;
+use crate::{dto::node_dto::NodeDto, service_params::node_service_params::EditServerServiceParams};
+use crate::service_params::node_service_params::AddServerServiceParams;
 use crate::database::get_db_pool;
 use crate::helper::{create_key_pair, custom_print, db_array_placeholders};
 use sqlx::{Row};
 
-pub async fn get_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::error::Error>> {
+pub async fn find_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let row = sqlx::query("SELECT * FROM nodes WHERE name = ?")
         .bind(&name)
@@ -28,7 +28,36 @@ pub async fn get_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::erro
     })
 }
 
-pub async fn add_server(params: NewNodeServiceParams) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn get_server_by_names(name: &str) -> Result<Vec<NodeDto>, Box<dyn std::error::Error>> {
+    let pool = get_db_pool().await?;
+    let rows = sqlx::query("SELECT * FROM nodes WHERE name = ?")
+        .bind(&name)
+        .fetch_all(&pool)
+        .await?;
+
+    let mut node_dtos = Vec::new();
+    for row in rows {
+        let id: i64 = row.get("id");
+        let name: String = row.get("name");
+        let address: String = row.get("address");
+        let node_type: String = row.get("node_type");
+        let parent_id: Option<i64> = row.get("parent_id");
+        let key: Option<String> = row.get("key");
+
+        node_dtos.push(NodeDto{
+            id: id,
+            name: name,
+            address: address,
+            node_type: node_type,
+            parent_id: parent_id,
+            key: key,
+        })
+    }
+
+    Ok(node_dtos)
+}
+
+pub async fn add_server(params: AddServerServiceParams) -> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
 
@@ -72,7 +101,7 @@ pub async fn add_server(params: NewNodeServiceParams) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-pub async fn edit_server(id: i64, params: EditNodeServiceParams) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn edit_server(id: i64, params: EditServerServiceParams) -> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
 
