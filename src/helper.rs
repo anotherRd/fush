@@ -142,13 +142,18 @@ pub fn connect_to_container(
 
     let shells = vec!["bash", "ash", "sh"];
     for shell in shells {
+        // prepare command
         let mut tmp_args = args.clone();
         tmp_args.push(&shell);
 
-        let shell_status = Command::new("docker")
-            .args(tmp_args)
-            .status()?;
+        let mut cmd = Command::new("docker");
+        cmd.args(tmp_args);
         
+        // print before executed
+        println!("{:?}", cmd);
+
+        // execute
+        let shell_status = cmd.status()?;
         if shell_status.success() {
             break;
         }

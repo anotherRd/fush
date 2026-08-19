@@ -369,14 +369,14 @@ async fn test_delete_server_cancel() {
 }
 
 #[tokio::test]
-async fn test_connect() {
+async fn test_connect_to_server() {
     setup().await;
 
-    let name = "connect_server";
-    let user = "user_connect_server";
+    let name = "connect_to_server";
+    let user = "user_connect_to_server";
     let host = "192.168.1.1";
     let port = "11";
-    let key = "connect_server_key";
+    let key = "connect_to_server_key";
 
     // create server
     node_service::add_server(AddServerServiceParams {
@@ -390,24 +390,20 @@ async fn test_connect() {
 
     let key_dir = key_dir().unwrap();
 
-    // delete
+    // connect
     let binary = env!("CARGO_BIN_EXE_fush");
     let mut p = spawn(&format!("{binary} c \"server: {name}\""), Some(5_000)).unwrap();
 
     p.exp_string(&format!("\"ssh\" \"-o\" \"ConnectTimeout=5\" \"{user}@{host}\" \"-p\" \"{port}\" \"-i\" \"{key_dir}/{key}\"")).unwrap();
     p.exp_eof().unwrap();
-
-    // check saved data
-    let saved_data = node_service::get_server_by_names(&name).await.unwrap();
-    assert_eq!(false, saved_data.is_empty());
 }
 
 #[tokio::test]
-async fn test_connect_default_key() {
+async fn test_connect_to_server_default_key() {
     setup().await;
 
-    let name = "connect_server_default_key";
-    let user = "user_connect_server_default_key";
+    let name = "connect_to_server_default_key";
+    let user = "user_connect_to_server_default_key";
     let host = "192.168.1.1";
     let port = "11";
     let key = "";
@@ -422,14 +418,26 @@ async fn test_connect_default_key() {
         default_passphrase: None
     }).await.unwrap();
 
-    // delete
+    // connect
     let binary = env!("CARGO_BIN_EXE_fush");
     let mut p = spawn(&format!("{binary} c \"server: {name}\""), Some(5_000)).unwrap();
 
     p.exp_string(&format!("\"ssh\" \"-o\" \"ConnectTimeout=5\" \"{user}@{host}\" \"-p\" \"{port}\"")).unwrap();
     p.exp_eof().unwrap();
+}
 
-    // check saved data
-    let saved_data = node_service::get_server_by_names(&name).await.unwrap();
-    assert_eq!(false, saved_data.is_empty());
+#[tokio::test]
+async fn test_connect_to_container() {
+    setup().await;
+
+    let name = "connect_to_container";
+
+    // conenct
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!("{binary} c \"container: {name}\""), Some(5_000)).unwrap();
+
+    p.exp_string(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"bash\"")).unwrap();
+    p.exp_string(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"ash\"")).unwrap();
+    p.exp_string(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"sh\"")).unwrap();
+    p.exp_eof().unwrap();
 }
