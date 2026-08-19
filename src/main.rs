@@ -78,7 +78,11 @@ async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
     let user = read_from_input(&format!("User ({old_user})"), Some(&old_user), vec![], true)?;
     let host = read_from_input(&format!("Host ({old_host})"), Some(&old_host), vec![], true)?;
     let port = read_from_input(&format!("Port ({old_port})"), Some(&old_port), vec![], true)?;
-    let change_key = read_from_input(&format!("Change key ({}) [y/n]?", node_dto.key.as_ref().unwrap()), None, vec!["y", "n"], true)?;
+    let change_key_caption = match &node_dto.key {
+        Some(key) => format!("Change key ({}) [y/n]?", key),
+        None => "Change key [y/n]?".to_string(),
+    };
+    let change_key = read_from_input(&change_key_caption, None, vec!["y", "n"], true)?;
 
     let key;
     if change_key == "y" {
