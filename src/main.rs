@@ -154,7 +154,7 @@ async fn connect(selected: String)-> Result<(), Box<dyn std::error::Error>> {
             let server_address: String = row.get("server_address");
             
             // execute ssh
-            connect_to_server_container(&container_address, &server_key, &server_address, vec!["-t"])?;
+            connect_to_server_container(&container_address, &server_key, &server_address, vec![])?;
         },
         _ => ()
     }

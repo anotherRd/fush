@@ -176,18 +176,47 @@ pub fn connect_to_server_container(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ssh_args = connect_to_server_args(&server_key, &server_address, &additional_args)?;
     let docker_command = format!("docker exec -it {container_address}");
+    let docker_check_shell_command = format!("docker exec {container_address} sh -c");
 
     let shells = vec!["bash", "ash", "sh"];
     for shell in shells {
+        // let tmp_docker_command = format!("{docker_command} {shell}");
+        // let mut tmp_ssh_args = ssh_args.clone();
+        // tmp_ssh_args.push(tmp_docker_command);
+        
+        // let shell_status = Command::new("ssh")
+        //     .args(tmp_ssh_args)
+        //     .status()?;
+        
+        // if shell_status.success() {
+        //     break;
+        // }
+        
+        // prepare shell check command
+        let tmp_docker_command = format!("{docker_check_shell_command} {shell}");
+        let mut tmp_ssh_args = ssh_args.clone();
+        tmp_ssh_args.push(tmp_docker_command);
+        
+        let mut cmd = Command::new("ssh");
+        cmd.args(&tmp_ssh_args);
+        
+        // print before executed
+        println!("{:?}", cmd);
+        
+        // execute
+        let shell_status = cmd.status()?;
+        
+        // prepare connection command
         let tmp_docker_command = format!("{docker_command} {shell}");
         let mut tmp_ssh_args = ssh_args.clone();
         tmp_ssh_args.push(tmp_docker_command);
         
-        let shell_status = Command::new("ssh")
-            .args(tmp_ssh_args)
-            .status()?;
-        
+        let mut connection_cmd = Command::new("ssh");
+        connection_cmd.arg("-t");
+        connection_cmd.args(tmp_ssh_args);
+        println!("{:?}", connection_cmd);
         if shell_status.success() {
+            connection_cmd.status()?;
             break;
         }
     }

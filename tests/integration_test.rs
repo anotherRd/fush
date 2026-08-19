@@ -520,3 +520,38 @@ async fn test_connect_to_container() {
     p.exp_regex(&format!(r#""docker" "exec" "-it" "{name}" "(?:bash|ash|sh)""#)).unwrap();
     p.exp_eof().unwrap();
 }
+
+#[tokio::test]
+async fn test_connect_to_server_container() {
+    setup().await;
+
+    let name = "connect_to_server_container";
+    let user = "user_connect_to_server_container";
+    let host = "192.168.1.1";
+    let port = "11";
+    let key = "";
+
+    // create server
+    node_service::add_server(AddServerServiceParams {
+        name: name.to_string(),
+        user: user.to_string(),
+        host: host.to_string(),
+        port: port.to_string(),
+        key: key.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+
+    // scan
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!(r#"{binary} s "server: {name}" -f "fake-container-1" -f "fake-container-2""#), Some(5_000)).unwrap();
+    p.exp_string("finished").unwrap();
+    p.exp_eof().unwrap();
+
+    // conenct
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!(r#"{binary} c "server container: {name}: fake-container-1""#), Some(5_000)).unwrap();
+
+    p.exp_regex(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec fake-container-1 sh -c (?:bash|ash|sh)""#)).unwrap();
+    p.exp_regex(&format!(r#""ssh" "-t" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec -it fake-container-1 (?:bash|ash|sh)""#)).unwrap();
+    p.exp_eof().unwrap();
+}
