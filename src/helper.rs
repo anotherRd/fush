@@ -29,7 +29,16 @@ pub fn check_requirement() {
     }
 }
 
-pub fn read_from_input(caption: &str, default: Option<&str>, choices: Vec<&str>, required: bool) -> Result<String, Box<dyn std::error::Error>> {
+pub fn is_test() -> bool {
+    cfg!(test)
+}
+
+pub fn read_from_input(
+    caption: &str,
+    default: Option<&str>,
+    choices: Vec<&str>,
+    required: bool
+) -> Result<String, Box<dyn std::error::Error>> {
     let mut input = String::new();
     let mut trimmed_input = "";
     let mut continue_loop = true;
@@ -313,10 +322,26 @@ pub fn create_key_pair(key: &str, overwrite: bool) -> Result<bool, Box<dyn std::
     }
 
     let key_location = format!("{}/{}", &key_dir, &key);
-        Command::new("ssh-keygen")
-            .args(["-f", &key_location])
-            .output()?;
+    
+    let mut ssh_keygen_args = vec!["-f", &key_location];
+    
+    // skip passphrase for test
+    if is_test() {
+        ssh_keygen_args.extend(["-N", ""]);
+    }
+
+    Command::new("ssh-keygen")
+        .args(ssh_keygen_args)
+        .output()?;
 
     return Ok(true);
 
+}
+
+pub fn split_server_address(address: &str) -> (String, String, String) {
+    // split address
+    let (user, rest) = address.split_once('@').unwrap();
+    let (host, port) = rest.split_once(':').unwrap();
+
+    (user.to_string(), host.to_string(), port.to_string())
 }

@@ -2,14 +2,19 @@ pub mod helper;
 pub mod migration;
 pub mod database;
 pub mod config;
+pub mod dto;
+pub mod service;
+pub mod service_params;
 
 use clap::{Parser, CommandFactory};
 use std::env;
 use std::process::{Command};
-use crate::helper::{read_from_input, split_selected, connect_to_server, connect_to_container, connect_to_server_container, db_array_placeholders, connect_to_server_args, select_server, select_multi_server, select_nodes, create_key_pair, key_pair_exists, check_requirement};
+use crate::helper::{check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, db_array_placeholders, key_pair_exists, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
 use crate::config::{key_dir};
 use crate::migration::migrate;
 use crate::database::get_db_pool;
+use crate::service::node_service;
+use crate::service_params::node_service_params::{EditNodeServiceParams, NewNodeServiceParams};
 use sqlx::{Row};
 use crate::config::{init_config};
 use std::fs;
@@ -39,54 +44,21 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
     let user = read_from_input("User", None, vec![], true)?;
     let host = read_from_input("Host", None, vec![], true)?;
     let port = read_from_input("Port (22)", Some("22"), vec![], true)?;
-    let key_input = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
-    let key = if key_input == "" { None } else { Some(key_input) };
-
-    let port = if port == "" { "22" } else { &port };
-    let address = format!("{user}@{host}:{port}");
-
-    let pool = get_db_pool().await?;
-    let mut tx = pool.begin().await?;
-
-    sqlx::query(
-            "INSERT INTO nodes (
-                name,
-                address,
-                node_type,
-                key
-            ) VALUES (
-                ?, 
-                ?,
-                ?,
-                ?
-            )"
-        )
-        .bind(&name)
-        .bind(&address)
-        .bind("server")
-        .bind(&key)
-        .execute(&mut *tx)
-        .await?;
-
-    // generate key
-    if let Some(key_value) = &key {
-        if !create_key_pair(&key_value, false)? {
-            println!("INFO use existing key: {key_value}");
-        } else {
-            println!("INFO created key: {key_value}");
-        }
-    }
-
-    tx.commit().await?;
-    println!("INFO server created: {name}");
+    let key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
+    
+    // save new node
+    node_service::new_node(NewNodeServiceParams {
+        name: name,
+        user: user,
+        host: host,
+        port: port,
+        key: key,
+    }).await?;
 
     Ok(())
 }
 
 async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
-    let pool = get_db_pool().await?;
-    let mut tx = pool.begin().await?;
-    
     // start selection
     let selected = select_server("Select server to edit").await?;
     if selected == "" {
@@ -96,76 +68,38 @@ async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
     // format selected
     let (_prefix, selected_name) = split_selected(&selected);
 
-    // get detail
-    let row = sqlx::query("SELECT * FROM nodes WHERE name = ?")
-        .bind(&selected_name)
-        .fetch_one(&pool)
-        .await?;
-
-    let old_id: i64 = row.get("id");
-    let old_name: String = row.get("name");
-    let old_key: Option<String> = row.get("key");
-    let old_node_type: String = row.get("node_type");
-    let old_address: String = row.get("address");
-
-    // split address
-    let (old_user, rest) = old_address.split_once('@').unwrap();
-    let (old_host, old_port) = rest.split_once(':').unwrap();
+    // get server
+    let node_dto = node_service::get_server_by_name(&selected_name).await?;
+    let (old_user, old_host, old_port) = split_server_address(&node_dto.address);
 
     // read user input
     println!("Edit server: {selected_name}");
-    let name = read_from_input(&format!("Name ({old_name})"), Some(&old_name), vec![], true)?;
+    let name = read_from_input(&format!("Name ({})", &node_dto.name), Some(&node_dto.name), vec![], true)?;
     let user = read_from_input(&format!("User ({old_user})"), Some(&old_user), vec![], true)?;
     let host = read_from_input(&format!("Host ({old_host})"), Some(&old_host), vec![], true)?;
     let port = read_from_input(&format!("Port ({old_port})"), Some(&old_port), vec![], true)?;
-    let change_key = read_from_input(&format!("Change key ({}) [y/n]?", old_key.as_ref().unwrap()), None, vec!["y", "n"], true)?;
+    let change_key = read_from_input(&format!("Change key ({}) [y/n]?", node_dto.key.as_ref().unwrap()), None, vec!["y", "n"], true)?;
 
     let key;
     if change_key == "y" {
-        let key_input = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
-        key = if key_input == "" { None } else { Some(key_input) };
+        key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
     } else {
-        key = old_key;
+        key = node_dto.key.unwrap_or("".to_string());
     }
 
-    let port = if port == "" { "22" } else { &port };
-    let address = format!("{user}@{host}:{port}");
-
-    sqlx::query(
-            "UPDATE nodes
-                set name = ?,
-                address = ?,
-                node_type = ?,
-                key = ?
-            WHERE id = ?"
-        )
-        .bind(&name)
-        .bind(&address)
-        .bind(&old_node_type)
-        .bind(&key)
-        .bind(&old_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // generate key
-    if let Some(key_value) = &key {
-        if !create_key_pair(&key_value, false)? {
-            println!("INFO use existing key: {key_value}");
-        } else {
-            println!("INFO created key: {key_value}");
-        }
-    }
-
-    tx.commit().await?;
-    println!("INFO server updated");
+    // save edit node
+    node_service::edit_node(node_dto.id, EditNodeServiceParams {
+        name: name,
+        user: user,
+        host: host,
+        port: port,
+        key: key,
+    }).await?;
 
     Ok(())
 }
 
 async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
-    let pool = get_db_pool().await?;
-    let mut tx = pool.begin().await?;
-
     // start multi selection
     let selections = select_multi_server("Select server(s) to delete").await?;
 
@@ -189,22 +123,8 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
         selected_names.push(selected_name);
     }
 
-    // delete from db
-    let query = format!(
-        "DELETE FROM nodes WHERE name IN ({})",
-        &db_array_placeholders(selected_names.len())
-    );
-
-    // bind actual data
-    let mut q = sqlx::query(&query);
-    for selected_name in &selected_names {
-        q = q.bind(selected_name);
-    }
-    q.execute(&mut *tx).await?;
-
-    tx.commit().await?;
-    
-    println!("INFO {:?} deleted", {&selections});
+    // delete server
+    node_service::delete_server_by_names(&selected_names).await?;
     
     Ok(())
 }
