@@ -136,14 +136,14 @@ pub fn connect_to_server(
 pub fn connect_to_container(
     address: &str,
     additional_args: Vec<&str>
-) -> Result<(), Box<dyn std::error::Error>> { 
-    let mut args = vec!["exec", "-it", &address];
-    args.extend(additional_args);
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut check_args = vec!["exec", &address, "sh", "-c"];
+    check_args.extend(&additional_args);
 
     let shells = vec!["bash", "ash", "sh"];
     for shell in shells {
         // prepare command
-        let mut tmp_args = args.clone();
+        let mut tmp_args = check_args.clone();
         tmp_args.push(&shell);
 
         let mut cmd = Command::new("docker");
@@ -154,7 +154,13 @@ pub fn connect_to_container(
 
         // execute
         let shell_status = cmd.status()?;
+        
+        // prepare connection
+        let mut connection_cmd = Command::new("docker");
+        connection_cmd.args(["exec", "-it", &address, &shell]);
+        println!("{:?}", connection_cmd);
         if shell_status.success() {
+            connection_cmd.status()?;
             break;
         }
     }

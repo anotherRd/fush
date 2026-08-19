@@ -436,8 +436,7 @@ async fn test_connect_to_container() {
     let binary = env!("CARGO_BIN_EXE_fush");
     let mut p = spawn(&format!("{binary} c \"container: {name}\""), Some(5_000)).unwrap();
 
-    p.exp_string(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"bash\"")).unwrap();
-    p.exp_string(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"ash\"")).unwrap();
-    p.exp_string(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"sh\"")).unwrap();
+    p.exp_regex(&format!("\"docker\" \"exec\" \"{name}\" \"sh\" \"-c\" \"(?:bash|ash|sh)\"")).unwrap();
+    p.exp_regex(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"(?:bash|ash|sh)\"")).unwrap();
     p.exp_eof().unwrap();
 }
