@@ -1,45 +1,20 @@
-pub mod helper;
-pub mod migration;
-pub mod database;
-pub mod config;
-pub mod dto;
-pub mod service;
-pub mod service_params;
-
-use clap::{Parser, CommandFactory};
-use std::env;
+use clap::{Parser};
+use fush::custom_command::{Cli, Commands};
+use std::{vec};
 use std::process::{Command};
-use crate::helper::{check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, db_array_placeholders, key_pair_exists, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
-use crate::config::{key_dir};
-use crate::migration::migrate;
-use crate::database::get_db_pool;
-use crate::service::node_service;
-use crate::service_params::node_service_params::{EditNodeServiceParams, NewNodeServiceParams};
+use fush::helper::{check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, custom_print, db_array_placeholders, key_pair_exists, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
+use fush::config::{key_dir};
+use fush::migration::migrate;
+use fush::database::get_db_pool;
+use fush::service::node_service;
+use fush::service_params::node_service_params::{EditNodeServiceParams, NewNodeServiceParams};
 use sqlx::{Row};
-use crate::config::{init_config};
+use fush::config::{init_config};
 use std::fs;
 
-#[derive(Parser, Debug)]
-struct Args {
-    #[arg(short, long)]
-    connect: bool,
-    #[arg(short='S', long)]
-    sync_all_server_container: bool,
-    #[arg(short, long)]
-    scyn_server_container: bool,
-    #[arg(short, long, help = "Add new server")]
-    new: bool,
-    #[arg(short, long, help = "Delete server")]
-    delete: bool,
-    #[arg(short, long, help = "Edit server")]
-    edit: bool,
-    #[arg(short, long, help = "Show custom key path and content")]
-    key: bool,
-}
-
-async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
+async fn add_server() -> Result<(), Box<dyn std::error::Error>> {
     // read user input
-    println!("Create new server");
+    custom_print("info", "Add new server");
     let name = read_from_input("Name", None, vec![], true)?;
     let user = read_from_input("User", None, vec![], true)?;
     let host = read_from_input("Host", None, vec![], true)?;
@@ -47,7 +22,7 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
     let key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
     
     // save new node
-    node_service::new_node(NewNodeServiceParams {
+    node_service::add_server(NewNodeServiceParams {
         name: name,
         user: user,
         host: host,
@@ -58,9 +33,7 @@ async fn new_node() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
-    // start selection
-    let selected = select_server("Select server to edit").await?;
+async fn edit_server(selected: String) -> Result<(), Box<dyn std::error::Error>> {
     if selected == "" {
         return Ok(());
     }
@@ -73,7 +46,7 @@ async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
     let (old_user, old_host, old_port) = split_server_address(&node_dto.address);
 
     // read user input
-    println!("Edit server: {selected_name}");
+    custom_print("info", &format!("Edit server: {selected_name}"));
     let name = read_from_input(&format!("Name ({})", &node_dto.name), Some(&node_dto.name), vec![], true)?;
     let user = read_from_input(&format!("User ({old_user})"), Some(&old_user), vec![], true)?;
     let host = read_from_input(&format!("Host ({old_host})"), Some(&old_host), vec![], true)?;
@@ -92,7 +65,7 @@ async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // save edit node
-    node_service::edit_node(node_dto.id, EditNodeServiceParams {
+    node_service::edit_server(node_dto.id, EditNodeServiceParams {
         name: name,
         user: user,
         host: host,
@@ -103,17 +76,14 @@ async fn edit_node() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
-    // start multi selection
-    let selections = select_multi_server("Select server(s) to delete").await?;
-
+async fn delete_server(selections: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     // if nothing is selected
-    if selections.len() == 0 {
+    if selections.is_empty() {
         return Ok(());
     }
 
     // confirmation
-    println!("To be deleted:");
+    custom_print("warning", &format!("To be deleted:"));
     println!("{:?}", &selections);
     let confirmation = read_from_input("Are you sure [y/n]?", None, vec!["y", "n"], true)?;
     if confirmation == "n" {
@@ -133,18 +103,18 @@ async fn delete_node() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn connect()-> Result<(), Box<dyn std::error::Error>> {
+async fn connect(selected: String)-> Result<(), Box<dyn std::error::Error>> {
+    // return if nothing is selected
+    if selected == "" {
+        return Ok(())
+    }
     let pool = get_db_pool().await?;
 
     // start selection
     let selected = select_nodes("Select node to connect").await?;
 
-    // return if nothing is selected
-    if selected == "" {
-        return Ok(())
-    }
 
-    println!("Selected: {selected}");
+    custom_print("info", &format!("Selected: {selected}"));
     let (prefix, selected) = split_selected(&selected);
 
     // connect
@@ -195,16 +165,13 @@ async fn connect()-> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn scyn_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::Error>> {
+async fn scan_server_container(scan_all: bool, selections: Vec<String>)-> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
     let rows;
 
     // select nodes if scan all is false
     if !scan_all {
-        // start multi selection
-        let selections = select_multi_server("Select server(s) to scan").await?;
-
         // if nothing is selected
         if selections.len() == 0 {
             return Ok(());
@@ -242,7 +209,7 @@ async fn scyn_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
         let key: Option<&str> = row.get("key");
         let address: String = row.get("address");
 
-        println!("Scanning container on : {name}");
+        custom_print("info", &format!("Scanning container on : {name}"));
         
         // ssh args
         let mut ssh_args = connect_to_server_args(&key, &address, &vec![])?;
@@ -295,18 +262,15 @@ async fn scyn_server_container(scan_all: bool)-> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
-    let pool = get_db_pool().await?;
-
-    // start selection
-    let selected = select_server("Select server to show key").await?;
-
+async fn show_key(selected: String)-> Result<(), Box<dyn std::error::Error>> {
     // return if nothing is selected
     if selected == "" {
         return Ok(())
     }
 
-    println!("Selected: {selected}");
+    let pool = get_db_pool().await?;
+
+    custom_print("info", &format!("Selected: {selected}"));
     let (_prefix, selected_name) = split_selected(&selected);
 
     // get detail
@@ -324,10 +288,10 @@ async fn show_key()-> Result<(), Box<dyn std::error::Error>> {
             println!("Key path: {key_path}");
             println!("{key_content}");
         } else {
-            eprintln!("ERROR Key {key_value} not found");
+            custom_print("error", &format!("Key {key_value} not found"));
         }
     } else {
-        println!("Use default keys");
+        custom_print("info", &format!("Use default keys"));
     }
 
 
@@ -345,28 +309,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // migrate db
     let _ = migrate().await?;
 
-    // args not provided
-    if env::args().len() == 1 {
-        Args::command().print_help()?;
-    }
-
-    // get args
-    let args = Args::parse();
-
-    if args.connect {
-        connect().await?;
-    } else if args.new {
-        new_node().await?;
-    } else if args.edit {
-        edit_node().await?;
-    } else if args.delete {
-        delete_node().await?;
-    } else if args.sync_all_server_container {
-        scyn_server_container(true).await?;
-    } else if args.scyn_server_container {
-        scyn_server_container(false).await?;
-    } else if args.key {
-        show_key().await?;
+    // command
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Conenct { arg } => {
+            let selected;
+            if let Some(selected_value) = arg {
+                selected = selected_value;
+            } else {
+                selected = select_nodes("Select node to connect").await?;
+            }
+            connect(selected).await?;
+        },
+        Commands::Add => {
+            add_server().await?;
+        },
+        Commands::Edit { arg } => {
+            let selected;
+            if let Some(selected_value) = arg {
+                selected = selected_value;
+            } else {
+                selected = select_server("Select server to edit").await?;
+            }
+            edit_server(selected).await?;
+        }
+        Commands::Delete { args } => {
+            let selections;
+            if !args.is_empty() {
+                selections = args;
+            } else {
+                selections = select_multi_server("Select server(s) to delete").await?;
+            }
+            delete_server(selections).await?;
+        }
+        Commands::Scan { args } => {
+            let selections;
+            if !args.is_empty() {
+                selections = args;
+            } else {
+                selections = select_multi_server("Select server(s) to scan").await?;
+            }
+            scan_server_container(false, selections).await?;
+        }
+        Commands::ScanAll => {
+            scan_server_container(true, vec![]).await?;
+        }
+        Commands::ShowKey { arg } => {
+            let selected;
+            if let Some(selected_value) = arg {
+                selected = selected_value;
+            } else {
+                selected = select_server("Select server to show key").await?;
+            }
+            show_key(selected).await?;
+        }
     }
 
     Ok(())

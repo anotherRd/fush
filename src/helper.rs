@@ -21,7 +21,7 @@ pub fn check_requirement() {
         .collect();
 
     for command in &missing {
-        eprintln!("ERROR missing: {command}");
+        custom_print("error", &format!("missing: {command})"));
     }
 
     if missing.len() > 0 {
@@ -58,14 +58,14 @@ pub fn read_from_input(
             if let Some(default_value) = default {
                 trimmed_input = default_value;
             } else if required{
-                println!("{caption} is required");
+                custom_print("warning", &format!("{caption} is required"));
                 continue_loop = true;
             }
         } else if choices.len() > 0 {
             // if choices available
             if !choices.contains(&trimmed_input) {
                 let choice_values = choices.join("/");
-                println!("{caption} value must be [{choice_values}]");
+                custom_print("warning", &format!("{caption} value must be [{choice_values}]"));
                 continue_loop = true;
             }
         }
@@ -322,16 +322,9 @@ pub fn create_key_pair(key: &str, overwrite: bool) -> Result<bool, Box<dyn std::
     }
 
     let key_location = format!("{}/{}", &key_dir, &key);
-    
-    let mut ssh_keygen_args = vec!["-f", &key_location];
-    
-    // skip passphrase for test
-    if is_test() {
-        ssh_keygen_args.extend(["-N", ""]);
-    }
-
     Command::new("ssh-keygen")
-        .args(ssh_keygen_args)
+        .env("SSH_ASKPASS_REQUIRE", "never")
+        .args(["-f", &key_location])
         .output()?;
 
     return Ok(true);
@@ -344,4 +337,25 @@ pub fn split_server_address(address: &str) -> (String, String, String) {
     let (host, port) = rest.split_once(':').unwrap();
 
     (user.to_string(), host.to_string(), port.to_string())
+}
+
+pub fn custom_print(message_type: &str, message: &str) {
+    match message_type {
+        "info" => {
+            println!("Info:     {message}");
+        },
+        "success" => {
+            println!("Success:  {message}");
+        },
+        "warning" => {
+            println!("Warning:  {message}");
+        },
+        "error" =>  {
+            eprintln!("Error:   {message}");
+
+        },
+        _ => {
+            println!("{message}");
+        }
+    }
 }

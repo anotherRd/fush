@@ -1,7 +1,7 @@
 use crate::{dto::node_dto::NodeDto, service_params::node_service_params::EditNodeServiceParams};
 use crate::service_params::node_service_params::NewNodeServiceParams;
 use crate::database::get_db_pool;
-use crate::helper::{create_key_pair, db_array_placeholders};
+use crate::helper::{create_key_pair, custom_print, db_array_placeholders};
 use sqlx::{Row};
 
 pub async fn get_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::error::Error>> {
@@ -28,7 +28,7 @@ pub async fn get_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::erro
     })
 }
 
-pub async fn new_node(params: NewNodeServiceParams) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn add_server(params: NewNodeServiceParams) -> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
 
@@ -59,20 +59,20 @@ pub async fn new_node(params: NewNodeServiceParams) -> Result<(), Box<dyn std::e
     // generate key
     if let Some(key_value) = &key {
         if !create_key_pair(&key_value, false)? {
-            println!("INFO use existing key: {key_value}");
+            custom_print("info", &format!("use existing key: {key_value}"));
         } else {
-            println!("INFO create new key: {key_value}");
+            custom_print("info", &format!("new key created: {key_value}"));
         }
     }
 
     tx.commit().await?;
 
-    println!("SUCCESS server created");
+    custom_print("success", &format!("server added"));
 
     Ok(())
 }
 
-pub async fn edit_node(id: i64, params: EditNodeServiceParams) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn edit_server(id: i64, params: EditNodeServiceParams) -> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
 
@@ -97,15 +97,15 @@ pub async fn edit_node(id: i64, params: EditNodeServiceParams) -> Result<(), Box
     // generate key
     if let Some(key_value) = &key {
         if !create_key_pair(&key_value, false)? {
-            println!("INFO use existing key: {key_value}");
+            custom_print("info", &format!("use existing key: {key_value}"));
         } else {
-            println!("INFO create new key: {key_value}");
+            custom_print("info", &format!("new key created: {key_value}"));
         }
     }
 
     tx.commit().await?;
     
-    println!("SUCCESS server updated");
+    custom_print("success", &format!("server edited"));
 
     Ok(())
 }
@@ -129,7 +129,7 @@ pub async fn delete_server_by_names(names: &Vec<String>) -> Result<(), Box<dyn s
 
     tx.commit().await?;
 
-    println!("SUCCESS server: {:?} deleted", {&names});
+    custom_print("success", &format!("server: {:?} deleted", {&names}));
 
     Ok(())
 }
