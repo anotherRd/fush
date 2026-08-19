@@ -1,6 +1,6 @@
 use clap::{Parser};
 use fush::custom_command::{Cli, Commands};
-use std::{vec};
+use std::{println, vec};
 use std::process::{Command};
 use fush::helper::{check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, custom_print, db_array_placeholders, key_pair_exists, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
 use fush::config::{key_dir};
@@ -162,7 +162,7 @@ async fn connect(selected: String)-> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn scan_server_container(scan_all: bool, selections: Vec<String>)-> Result<(), Box<dyn std::error::Error>> {
+async fn scan_server_container(scan_all: bool, selections: Vec<String>, fake_containers: Vec<String>)-> Result<(), Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
     let mut tx = pool.begin().await?;
     let rows;
@@ -192,7 +192,7 @@ async fn scan_server_container(scan_all: bool, selections: Vec<String>)-> Result
         for selected_name in &selected_names {
             q = q.bind(selected_name);
         }
-        rows = q.fetch_all(&mut *tx).await?;
+        rows = q.fetch_all(&pool).await?;
     } else {
         rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
             .fetch_all(&pool)
@@ -206,22 +206,28 @@ async fn scan_server_container(scan_all: bool, selections: Vec<String>)-> Result
         let key: Option<&str> = row.get("key");
         let address: String = row.get("address");
 
-        custom_print("info", &format!("Scanning container on : {name}"));
+        custom_print("info", &format!("scanning container on : {name}"));
         
         // ssh args
         let mut ssh_args = connect_to_server_args(&key, &address, &vec![])?;
         ssh_args.extend(["-t".to_string(), "docker ps --format {{.Names}}".to_string()]);
 
         // execute ssh
-        let output = Command::new("ssh")
-            .args(ssh_args)
-            .output()?;
+        let mut cmd = Command::new("ssh");
+        cmd.args(ssh_args);
+        println!("{:?}", cmd);
+        let output = cmd.output()?;
 
         // turn it to vec
-        let containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        let mut containers: Vec<String> = String::from_utf8_lossy(&output.stdout)
             .lines()
             .map(String::from)
             .collect();
+
+        // temp: for test purpose
+        if !fake_containers.is_empty() {
+            containers = fake_containers.clone();
+        }
 
         // delete server container on current node
         sqlx::query(
@@ -255,6 +261,8 @@ async fn scan_server_container(scan_all: bool, selections: Vec<String>)-> Result
         }
     }
     tx.commit().await?;
+
+    custom_print("info", &format!("finished"));
 
     Ok(())
 }
@@ -339,17 +347,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             delete_server(selections).await?;
         }
-        Commands::Scan { args } => {
+        Commands::Scan { args, fake_container } => {
             let selections;
             if !args.is_empty() {
                 selections = args;
             } else {
                 selections = select_multi_server("Select server(s) to scan").await?;
             }
-            scan_server_container(false, selections).await?;
+            scan_server_container(false, selections, fake_container).await?;
         }
-        Commands::ScanAll => {
-            scan_server_container(true, vec![]).await?;
+        Commands::ScanAll {fake_container} => {
+            scan_server_container(true, vec![], fake_container).await?;
         }
         Commands::ShowKey { arg } => {
             let selected;

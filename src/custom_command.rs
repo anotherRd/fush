@@ -25,9 +25,14 @@ pub enum Commands {
     #[command(alias = "s", about = "(alias: s) - scan one or more servers for available containers\nusage: fush scan \"server: development1\" \"server: development2\" or wihtout argument to use selector\n")]
     Scan {
         args: Vec<String>,
+        #[arg(short, long, hide = true)]
+        fake_container: Vec<String>,
     },
     #[command(alias = "S", about = "(alias: S) - scan-all servers for available containers\n")]
-    ScanAll,
+    ScanAll {
+        #[arg(short, long, hide = true)]
+        fake_container: Vec<String>,
+    },
     #[command(alias = "sk", about = "(alias: sk) - show public key path and content used by server\nusage: fush show-key \"server: development1\" or wihtout argument to use selector\n")]
     ShowKey {
         arg: Option<String>,

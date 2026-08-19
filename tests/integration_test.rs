@@ -1,5 +1,6 @@
 use fush::{helper::key_pair_exists, service::node_service, service_params::node_service_params::AddServerServiceParams};
 use rexpect::spawn;
+use sqlx::Row;
 use tokio::sync::OnceCell;
 use fush::database::get_db_pool;
 use fush::config::key_dir;
@@ -11,10 +12,11 @@ async fn setup() {
     SETUP
         .get_or_init(|| async {
             let pool = get_db_pool().await.unwrap();
-
+            let mut tx = pool.begin().await.unwrap();
+            
             // delete all data
             sqlx::query("DELETE FROM nodes")
-                .execute(&pool)
+                .execute(&mut *tx)
                 .await
                 .unwrap();
 
@@ -26,6 +28,7 @@ async fn setup() {
                     fs::remove_file(path).unwrap();
                 }
             }
+            tx.commit().await.unwrap();
         })
         .await;
 }
@@ -192,7 +195,7 @@ async fn test_edit_server() {
     let key_after = "edit_server_key_after";
 
     let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} e \"server: {name_before}\""), Some(5_000)).unwrap();
+    let mut p = spawn(&format!(r#"{binary} e "server: {name_before}""#), Some(5_000)).unwrap();
 
     p.exp_string(&format!("Name ({name_before}): ")).unwrap();
     p.send_line(&name_after).unwrap();
@@ -265,7 +268,7 @@ async fn test_edit_server_unchanged() {
     let port_after = "";
 
     let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} e \"server: {name_before}\""), Some(5_000)).unwrap();
+    let mut p = spawn(&format!(r#"{binary} e "server: {name_before}""#), Some(5_000)).unwrap();
 
     p.exp_string(&format!("Name ({name_before}): ")).unwrap();
     p.send_line(&name_after).unwrap();
@@ -321,7 +324,7 @@ async fn test_delete_server() {
 
     // delete
     let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} d \"server: {name}\""), Some(5_000)).unwrap();
+    let mut p = spawn(&format!(r#"{binary} d "server: {name}""#), Some(5_000)).unwrap();
 
     p.exp_string("Are you sure [y/n]?").unwrap();
     p.send_line("y").unwrap();
@@ -357,7 +360,7 @@ async fn test_delete_server_cancel() {
 
     // delete
     let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} d \"server: {name}\""), Some(5_000)).unwrap();
+    let mut p = spawn(&format!(r#"{binary} d "server: {name}""#), Some(5_000)).unwrap();
 
     p.exp_string("Are you sure [y/n]?").unwrap();
     p.send_line("n").unwrap();
@@ -366,6 +369,83 @@ async fn test_delete_server_cancel() {
     // check saved data
     let saved_data = node_service::get_server_by_names(&name).await.unwrap();
     assert_eq!(false, saved_data.is_empty());
+}
+
+#[tokio::test]
+async fn test_scan_server_container_selecttion() {
+    setup().await;
+
+    let name = "scan_server_container_selecttion";
+    let user = "user_scan_server_container_selecttion";
+    let host = "192.168.1.1";
+    let port = "11";
+    let key = "";
+
+    // create server
+    node_service::add_server(AddServerServiceParams {
+        name: name.to_string(),
+        user: user.to_string(),
+        host: host.to_string(),
+        port: port.to_string(),
+        key: key.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+
+
+    // scan
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!(r#"{binary} s "server: {name}" -f "fake-container-1" -f "fake-container-2""#), Some(5_000)).unwrap();
+
+    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t" "docker ps --format {{{{.Names}}}}""#)).unwrap();
+    p.exp_string("finished").unwrap();
+    p.exp_eof().unwrap();
+
+    // check count
+    let pool = get_db_pool().await.unwrap();
+    let row = sqlx::query("SELECT COUNT(*) AS count FROM nodes WHERE address = 'fake-container-1' OR address = 'fake-container-2'")
+        .fetch_one(&pool)
+        .await.unwrap();
+    let count: i64 = row.get("count");
+    assert_eq!(2, count);
+}
+
+#[tokio::test]
+async fn test_scan_server_container_all() {
+    setup().await;
+
+    let name = "scan_server_container_all";
+    let user = "user_scan_server_container_all";
+    let host = "192.168.1.1";
+    let port = "11";
+    let key = "";
+
+    // create server
+    node_service::add_server(AddServerServiceParams {
+        name: name.to_string(),
+        user: user.to_string(),
+        host: host.to_string(),
+        port: port.to_string(),
+        key: key.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+
+
+    // scan
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!(r#"{binary} S -f "fake-container-all-1" -f "fake-container-all-2""#), Some(5_000)).unwrap();
+
+    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t""#)).unwrap();
+    p.exp_string(&format!(r#""docker ps --format {{{{.Names}}}}""#)).unwrap();
+    p.exp_string("finished").unwrap();
+    p.exp_eof().unwrap();
+
+    // check count
+    let pool = get_db_pool().await.unwrap();
+    let row = sqlx::query("SELECT COUNT(*) AS count FROM nodes WHERE node_type = 'server_container' AND address != 'fake-container-all-1' AND address != 'fake-container-all-2'")
+        .fetch_one(&pool)
+        .await.unwrap();
+    let count: i64 = row.get("count");
+    assert_eq!(0, count);
 }
 
 #[tokio::test]
@@ -392,9 +472,9 @@ async fn test_connect_to_server() {
 
     // connect
     let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} c \"server: {name}\""), Some(5_000)).unwrap();
+    let mut p = spawn(&format!(r#"{binary} c "server: {name}""#), Some(5_000)).unwrap();
 
-    p.exp_string(&format!("\"ssh\" \"-o\" \"ConnectTimeout=5\" \"{user}@{host}\" \"-p\" \"{port}\" \"-i\" \"{key_dir}/{key}\"")).unwrap();
+    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-i" "{key_dir}/{key}""#)).unwrap();
     p.exp_eof().unwrap();
 }
 
@@ -420,9 +500,9 @@ async fn test_connect_to_server_default_key() {
 
     // connect
     let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} c \"server: {name}\""), Some(5_000)).unwrap();
+    let mut p = spawn(&format!(r#"{binary} c "server: {name}""#), Some(5_000)).unwrap();
 
-    p.exp_string(&format!("\"ssh\" \"-o\" \"ConnectTimeout=5\" \"{user}@{host}\" \"-p\" \"{port}\"")).unwrap();
+    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}""#)).unwrap();
     p.exp_eof().unwrap();
 }
 
@@ -434,9 +514,9 @@ async fn test_connect_to_container() {
 
     // conenct
     let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} c \"container: {name}\""), Some(5_000)).unwrap();
+    let mut p = spawn(&format!(r#"{binary} c "container: {name}""#), Some(5_000)).unwrap();
 
-    p.exp_regex(&format!("\"docker\" \"exec\" \"{name}\" \"sh\" \"-c\" \"(?:bash|ash|sh)\"")).unwrap();
-    p.exp_regex(&format!("\"docker\" \"exec\" \"-it\" \"{name}\" \"(?:bash|ash|sh)\"")).unwrap();
+    p.exp_regex(&format!(r#""docker" "exec" "{name}" "sh" "-c" "(?:bash|ash|sh)""#)).unwrap();
+    p.exp_regex(&format!(r#""docker" "exec" "-it" "{name}" "(?:bash|ash|sh)""#)).unwrap();
     p.exp_eof().unwrap();
 }

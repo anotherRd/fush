@@ -142,7 +142,7 @@ pub fn connect_to_container(
 
     let shells = vec!["bash", "ash", "sh"];
     for shell in shells {
-        // prepare command
+        // prepare shell check command
         let mut tmp_args = check_args.clone();
         tmp_args.push(&shell);
 
@@ -155,7 +155,7 @@ pub fn connect_to_container(
         // execute
         let shell_status = cmd.status()?;
         
-        // prepare connection
+        // prepare connection command
         let mut connection_cmd = Command::new("docker");
         connection_cmd.args(["exec", "-it", &address, &shell]);
         println!("{:?}", connection_cmd);
