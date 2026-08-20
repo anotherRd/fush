@@ -3,7 +3,7 @@ use fush::custom_command::{Cli, Commands};
 use fush::debug_println;
 use std::{println, vec};
 use std::process::{Command};
-use fush::helper::{check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, custom_print, db_array_placeholders, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
+use fush::helper::{auto_complete_key, check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, custom_print, db_array_placeholders, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
 use fush::config::{is_test, key_dir};
 use fush::migration::migrate;
 use fush::database::get_db_pool;
@@ -20,11 +20,7 @@ async fn add_server() -> Result<(), Box<dyn std::error::Error>> {
     let user = read_from_input("User", None, vec![], true)?;
     let host = read_from_input("Host", None, vec![], true)?;
     let port = read_from_input("Port (22)", Some("22"), vec![], true)?;
-    let mut key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
-    while key.ends_with(".pub") {
-        custom_print("info", &format!("key name end with .pub is not allowed"));
-        key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
-    }
+    let key = auto_complete_key("Key name (create if not exists and use default key/password if empty)", Some(""), vec![], false)?;
     
     // save new node
     node_service::add_server(AddServerServiceParams {
@@ -65,11 +61,7 @@ async fn edit_server(selected: String) -> Result<(), Box<dyn std::error::Error>>
 
     let mut key = node_dto.key.unwrap_or("".to_string());
     if change_key == "y" {
-        key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
-        while key.ends_with(".pub") {
-            custom_print("info", &format!("key name end with .pub is not allowed"));
-            key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
-        }
+        key = auto_complete_key("Key name (create if not exists and use default key/password if empty)", Some(""), vec![], false)?;
     }
 
     // save edit node

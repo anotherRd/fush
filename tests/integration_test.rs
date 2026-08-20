@@ -66,7 +66,7 @@ async fn test_add_server() {
     p.exp_string("Port (22): ").unwrap();
     p.send_line(&port).unwrap();
 
-    p.exp_string("Custom key name (use default key/password if empty): ").unwrap();
+    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
     p.send_line(&key).unwrap();
 
     p.exp_string("Enter passphrase").unwrap();
@@ -112,7 +112,7 @@ async fn test_add_server_default_value() {
     p.exp_string("Port (22): ").unwrap();
     p.send_line(&port).unwrap();
 
-    p.exp_string("Custom key name (use default key/password if empty): ").unwrap();
+    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
     p.send_line(&key).unwrap();
 
     p.exp_string("Success:").unwrap();
@@ -165,7 +165,7 @@ async fn test_add_server_duplicate_name() {
     p.exp_string("Port (22): ").unwrap();
     p.send_line(&port).unwrap();
 
-    p.exp_string("Custom key name (use default key/password if empty): ").unwrap();
+    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
     p.send_line(&key).unwrap();
 
     p.exp_string("Error: Database(SqliteError { code: 2067").unwrap();
@@ -222,7 +222,7 @@ async fn test_edit_server() {
         p.send_line("y").unwrap();
     }
 
-    p.exp_string("Custom key name (use default key/password if empty): ").unwrap();
+    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
     p.send_line(&key_after).unwrap();
 
     p.exp_string("Enter passphrase").unwrap();
