@@ -603,6 +603,6 @@ async fn test_show_key_default_key() {
 
     // scan
     let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], Some(5_000)).unwrap();
-    p.exp_string("Info:     Use default keys").unwrap();
+    p.exp_string("Info: Use default keys").unwrap();
     p.exp_eof().unwrap();
 }

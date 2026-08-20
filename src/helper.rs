@@ -396,13 +396,13 @@ pub fn custom_print(message_type: &str, message: &str) {
             println!("Info: {message}");
         },
         "success" => {
-            println!("Success {message}");
+            println!("Success: {message}");
         },
         "warning" => {
-            println!("Warning {message}");
+            println!("Warning: {message}");
         },
         "error" =>  {
-            eprintln!("Error {message}");
+            eprintln!("Error: {message}");
 
         },
         _ => {
