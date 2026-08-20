@@ -37,4 +37,6 @@ pub enum Commands {
     ShowKey {
         arg: Option<String>,
     },
+    #[cfg(debug_assertions)]
+    Test,
 }

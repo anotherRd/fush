@@ -405,16 +405,16 @@ pub fn split_server_address(address: &str) -> (String, String, String) {
 pub fn custom_print(message_type: &str, message: &str) {
     match message_type {
         "info" => {
-            println!("Info:     {message}");
+            println!("Info: {message}");
         },
         "success" => {
-            println!("Success:  {message}");
+            println!("Success {message}");
         },
         "warning" => {
-            println!("Warning:  {message}");
+            println!("Warning {message}");
         },
         "error" =>  {
-            eprintln!("Error:   {message}");
+            eprintln!("Error {message}");
 
         },
         _ => {

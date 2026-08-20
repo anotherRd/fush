@@ -1,6 +1,10 @@
 use std::fs::OpenOptions;
 use std::path::Path;
-use std::fs;
+use std::{fs};
+
+pub fn is_test() -> bool {
+    std::env::var_os("FUSH_TEST").is_some()
+}
 
 pub fn app_name() -> String {
     "fush".to_string()
@@ -8,9 +12,18 @@ pub fn app_name() -> String {
 
 pub fn config_dir() -> Result<String, Box<dyn std::error::Error>> {
     // get config dir
-    let config_dir = dirs::config_dir().ok_or("Config directory not found")?;
-    let config_dir = config_dir.to_string_lossy().to_string();
-    let config_dir = format!("{}/{}", &config_dir, &app_name());
+    let config_dir;
+    if is_test() {
+        let dir = std::env::temp_dir().to_string_lossy().to_string();
+        config_dir = format!("{}/{}_test", &dir, &app_name());
+    } else {
+        let dir = dirs::config_dir()
+            .ok_or("Config directory not found")?
+            .to_string_lossy()
+            .to_string();
+        config_dir = format!("{}/{}", &dir, &app_name());
+    }
+    
 
     Ok(config_dir)
 }

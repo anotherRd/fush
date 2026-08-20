@@ -1,12 +1,13 @@
 use fush::{helper::key_pair_exists, service::node_service, service_params::node_service_params::AddServerServiceParams};
-use rexpect::spawn;
+use rexpect::{error::Error, session::spawn_command};
 use sqlx::Row;
 use tokio::sync::OnceCell;
 use fush::database::get_db_pool;
 use fush::config::key_dir;
-use std::{assert_eq, format, fs};
+use std::{assert_eq, format, fs, process::Command};
 
 static SETUP: OnceCell<()> = OnceCell::const_new();
+const BINARY: &str = env!("CARGO_BIN_EXE_fush");
 
 async fn setup() {
     SETUP
@@ -33,6 +34,14 @@ async fn setup() {
         .await;
 }
 
+fn spawn_test(args: &Vec<&str>, timeout_ms: Option<u64>) -> Result<rexpect::session::PtySession, Error> {
+    let mut cmd = Command::new(BINARY);
+    cmd.env("FUSH_TEST", "1");
+    cmd.args(args);
+
+    spawn_command(cmd, timeout_ms)
+}
+
 #[tokio::test]
 async fn test_add_server() {
     setup().await;
@@ -43,8 +52,7 @@ async fn test_add_server() {
     let port = "33";
     let key = "add_server_key";
 
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} a"), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
 
     p.exp_string("Name: ").unwrap();
     p.send_line(&name).unwrap();
@@ -90,8 +98,7 @@ async fn test_add_server_default_value() {
     let port = "";
     let key = "";
 
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} a"), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
 
     p.exp_string("Name: ").unwrap();
     p.send_line(&name).unwrap();
@@ -144,8 +151,7 @@ async fn test_add_server_duplicate_name() {
 
 
     // create node with same name
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!("{binary} a"), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
 
     p.exp_string("Name: ").unwrap();
     p.send_line(&name).unwrap();
@@ -194,8 +200,7 @@ async fn test_edit_server() {
     let port_after = "33";
     let key_after = "edit_server_key_after";
 
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} e "server: {name_before}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
 
     p.exp_string(&format!("Name ({name_before}): ")).unwrap();
     p.send_line(&name_after).unwrap();
@@ -267,8 +272,7 @@ async fn test_edit_server_unchanged() {
     let host_after = "";
     let port_after = "";
 
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} e "server: {name_before}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
 
     p.exp_string(&format!("Name ({name_before}): ")).unwrap();
     p.send_line(&name_after).unwrap();
@@ -323,8 +327,7 @@ async fn test_delete_server() {
 
 
     // delete
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} d "server: {name}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["d", &format!("server: {name}")], Some(5_000)).unwrap();
 
     p.exp_string("Are you sure [y/n]?").unwrap();
     p.send_line("y").unwrap();
@@ -359,8 +362,7 @@ async fn test_delete_server_cancel() {
 
 
     // delete
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} d "server: {name}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["d", &format!("server: {name}")], Some(5_000)).unwrap();
 
     p.exp_string("Are you sure [y/n]?").unwrap();
     p.send_line("n").unwrap();
@@ -393,8 +395,7 @@ async fn test_scan_server_container_selecttion() {
 
 
     // scan
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} s "server: {name}" -f "fake-container-1" -f "fake-container-2""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
 
     p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t" "docker ps --format {{{{.Names}}}}""#)).unwrap();
     p.exp_string("finished").unwrap();
@@ -431,8 +432,7 @@ async fn test_scan_server_container_all() {
 
 
     // scan
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} S -f "fake-container-all-1" -f "fake-container-all-2""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["S", "-f", "fake-container-all-1", "-f", "fake-container-all-2"], Some(5_000)).unwrap();
 
     p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t""#)).unwrap();
     p.exp_string(&format!(r#""docker ps --format {{{{.Names}}}}""#)).unwrap();
@@ -471,8 +471,7 @@ async fn test_connect_to_server() {
     let key_dir = key_dir().unwrap();
 
     // connect
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} c "server: {name}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("server: {name}")], Some(5_000)).unwrap();
 
     p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-i" "{key_dir}/{key}""#)).unwrap();
     p.exp_eof().unwrap();
@@ -499,8 +498,7 @@ async fn test_connect_to_server_default_key() {
     }).await.unwrap();
 
     // connect
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} c "server: {name}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("server: {name}")], Some(5_000)).unwrap();
 
     p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}""#)).unwrap();
     p.exp_eof().unwrap();
@@ -513,8 +511,7 @@ async fn test_connect_to_container() {
     let name = "connect_to_container";
 
     // conenct
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} c "container: {name}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("container: {name}")], Some(5_000)).unwrap();
 
     p.exp_regex(&format!(r#""docker" "exec" "{name}" "sh" "-c" "(?:bash|ash|sh)""#)).unwrap();
     p.exp_regex(&format!(r#""docker" "exec" "-it" "{name}" "(?:bash|ash|sh)""#)).unwrap();
@@ -542,14 +539,12 @@ async fn test_connect_to_server_container() {
     }).await.unwrap();
 
     // scan
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} s "server: {name}" -f "fake-container-1" -f "fake-container-2""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
     p.exp_string("finished").unwrap();
     p.exp_eof().unwrap();
 
     // conenct
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} c "server container: {name}: fake-container-1""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
 
     p.exp_regex(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec fake-container-1 sh -c (?:bash|ash|sh)""#)).unwrap();
     p.exp_regex(&format!(r#""ssh" "-t" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec -it fake-container-1 (?:bash|ash|sh)""#)).unwrap();
@@ -580,8 +575,7 @@ async fn test_show_key() {
     let key_content = fs::read_to_string(&key_location).unwrap();
 
     // scan
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} sk "server: {name}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], Some(5_000)).unwrap();
     p.exp_string(&format!("Key location: {}", &key_location)).unwrap();
     p.exp_string(&key_content.trim()).unwrap();
     p.exp_eof().unwrap();
@@ -608,8 +602,7 @@ async fn test_show_key_default_key() {
     }).await.unwrap();
 
     // scan
-    let binary = env!("CARGO_BIN_EXE_fush");
-    let mut p = spawn(&format!(r#"{binary} sk "server: {name}""#), Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], Some(5_000)).unwrap();
     p.exp_string("Info:     Use default keys").unwrap();
     p.exp_eof().unwrap();
 }

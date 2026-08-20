@@ -4,7 +4,7 @@ use fush::debug_println;
 use std::{println, vec};
 use std::process::{Command};
 use fush::helper::{check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, custom_print, db_array_placeholders, key_pair_exists, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
-use fush::config::{key_dir};
+use fush::config::{is_test, key_dir};
 use fush::migration::migrate;
 use fush::database::get_db_pool;
 use fush::service::node_service;
@@ -348,7 +348,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             delete_server(selections).await?;
         }
-        Commands::Scan { args, fake_container } => {
+        Commands::Scan { args, mut fake_container } => {
+            if !is_test() {
+                fake_container = vec![];
+            }
+
             let selections;
             if !args.is_empty() {
                 selections = args;
@@ -357,7 +361,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             scan_server_container(false, selections, fake_container).await?;
         }
-        Commands::ScanAll {fake_container} => {
+        Commands::ScanAll {mut fake_container} => {
+            if !is_test() {
+                fake_container = vec![];
+            }
+
             scan_server_container(true, vec![], fake_container).await?;
         }
         Commands::ShowKey { arg } => {
@@ -368,6 +376,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 selected = select_server("Select server to show key").await?;
             }
             show_key(selected).await?;
+        }
+        #[cfg(debug_assertions)]
+        Commands::Test => {
+            Command::new("cargo")
+                .env("FUSH_TEST", "1")
+                .args(["test", "--", "--test-threads", "1"])
+                .status()?;
         }
     }
 
