@@ -1,12 +1,28 @@
+use crate::dto::node_dto::ParentNodeDto;
 use crate::{dto::node_dto::NodeDto, service_params::node_service_params::EditServerServiceParams};
 use crate::service_params::node_service_params::AddServerServiceParams;
 use crate::database::get_db_pool;
 use crate::helper::{create_key_pair, custom_print, db_array_placeholders};
 use sqlx::{Row};
 
-pub async fn find_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::error::Error>> {
+pub async fn find_node_by_name(name: &str) -> Result<NodeDto, Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
-    let row = sqlx::query("SELECT * FROM nodes WHERE name = ?")
+    let row = sqlx::query("SELECT 
+            nodes.id,
+            nodes.name,
+            nodes.address,
+            nodes.node_type,
+            nodes.parent_id,
+            nodes.key,
+            parent.id as parent_id,
+            parent.name as parent_name,
+            parent.address as parent_address,
+            parent.node_type as parent_node_type,
+            parent.parent_id as parent_parent_id,
+            parent.key as parent_key
+        FROM nodes 
+        LEFT JOIN nodes AS parent ON nodes.parent_id = parent.id
+        WHERE nodes.name = ?")
         .bind(&name)
         .fetch_one(&pool)
         .await?;
@@ -18,6 +34,25 @@ pub async fn find_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::err
     let parent_id: Option<i64> = row.get("parent_id");
     let key: Option<String> = row.get("key");
 
+    let mut parent: Option<ParentNodeDto> = None;
+    let check_parent: Option<i64> = row.get("parent_id");
+    if check_parent.is_some() {
+        let parent_id: i64 = row.get("parent_id");
+        let parent_name: String = row.get("parent_name");
+        let parent_address: String = row.get("parent_address");
+        let parent_node_type: String = row.get("parent_node_type");
+        let parent_parent_id: Option<i64> = row.get("parent_parent_id");
+        let parent_key: Option<String> = row.get("parent_key");
+        parent = Some(ParentNodeDto {
+            id: parent_id,
+            name: parent_name,
+            address: parent_address,
+            node_type: parent_node_type,
+            parent_id: parent_parent_id,
+            key: parent_key,
+        });
+    }
+
     Ok(NodeDto{
         id: id,
         name: name,
@@ -25,12 +60,28 @@ pub async fn find_server_by_name(name: &str) -> Result<NodeDto, Box<dyn std::err
         node_type: node_type,
         parent_id: parent_id,
         key: key,
+        parent: parent,
     })
 }
 
-pub async fn get_server_by_names(name: &str) -> Result<Vec<NodeDto>, Box<dyn std::error::Error>> {
+pub async fn get_node_by_names(name: &str) -> Result<Vec<NodeDto>, Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
-    let rows = sqlx::query("SELECT * FROM nodes WHERE name = ?")
+    let rows = sqlx::query("SELECT 
+            nodes.id,
+            nodes.name,
+            nodes.address,
+            nodes.node_type,
+            nodes.parent_id,
+            nodes.key,
+            parent.id as parent_id,
+            parent.name as parent_name,
+            parent.address as parent_address,
+            parent.node_type as parent_node_type,
+            parent.parent_id as parent_parent_id,
+            parent.key as parent_key
+        FROM nodes 
+        LEFT JOIN nodes AS parent ON nodes.parent_id = parent.id
+        WHERE nodes.name = ?")
         .bind(&name)
         .fetch_all(&pool)
         .await?;
@@ -44,6 +95,25 @@ pub async fn get_server_by_names(name: &str) -> Result<Vec<NodeDto>, Box<dyn std
         let parent_id: Option<i64> = row.get("parent_id");
         let key: Option<String> = row.get("key");
 
+        let mut parent: Option<ParentNodeDto> = None;
+        let check_parent: Option<i64> = row.get("parent_id");
+        if check_parent.is_some() {
+            let parent_id: i64 = row.get("parent_id");
+            let parent_name: String = row.get("parent_name");
+            let parent_address: String = row.get("parent_address");
+            let parent_node_type: String = row.get("parent_node_type");
+            let parent_parent_id: Option<i64> = row.get("parent_parent_id");
+            let parent_key: Option<String> = row.get("parent_key");
+            parent = Some(ParentNodeDto {
+                id: parent_id,
+                name: parent_name,
+                address: parent_address,
+                node_type: parent_node_type,
+                parent_id: parent_parent_id,
+                key: parent_key,
+            });
+        }
+
         node_dtos.push(NodeDto{
             id: id,
             name: name,
@@ -51,6 +121,7 @@ pub async fn get_server_by_names(name: &str) -> Result<Vec<NodeDto>, Box<dyn std
             node_type: node_type,
             parent_id: parent_id,
             key: key,
+            parent: parent,
         })
     }
 

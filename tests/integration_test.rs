@@ -78,7 +78,7 @@ async fn test_add_server() {
     p.exp_eof().unwrap();
 
     // check saved data
-    let saved_data = node_service::find_server_by_name(&name).await.unwrap();
+    let saved_data = node_service::find_node_by_name(&name).await.unwrap();
     assert_eq!(name, saved_data.name);
     assert_eq!(format!("{user}@{host}:{port}"), saved_data.address);
     assert_eq!(key, saved_data.key.unwrap());
@@ -119,7 +119,7 @@ async fn test_add_server_default_value() {
     p.exp_eof().unwrap();
 
     // check saved data
-    let saved_data = node_service::find_server_by_name(&name).await.unwrap();
+    let saved_data = node_service::find_node_by_name(&name).await.unwrap();
     assert_eq!(name, saved_data.name);
     assert_eq!(format!("{user}@{host}:22"), saved_data.address);
     assert_eq!(None, saved_data.key);
@@ -235,7 +235,7 @@ async fn test_edit_server() {
     p.exp_eof().unwrap();
 
     // check saved data
-    let saved_data = node_service::find_server_by_name(&name_after).await.unwrap();
+    let saved_data = node_service::find_node_by_name(&name_after).await.unwrap();
     assert_eq!(name_after, saved_data.name);
     assert_eq!(format!("{user_after}@{host_after}:{port_after}"), saved_data.address);
     assert_eq!(key_after, saved_data.key.unwrap());
@@ -298,7 +298,7 @@ async fn test_edit_server_unchanged() {
     p.exp_eof().unwrap();
 
     // check saved data
-    let saved_data = node_service::find_server_by_name(&name_before).await.unwrap();
+    let saved_data = node_service::find_node_by_name(&name_before).await.unwrap();
     assert_eq!(name_before, saved_data.name);
     assert_eq!(format!("{user_before}@{host_before}:{port_before}"), saved_data.address);
     assert_eq!(None, saved_data.key);
@@ -336,7 +336,7 @@ async fn test_delete_server() {
     p.exp_eof().unwrap();
 
     // check saved data
-    let saved_data = node_service::get_server_by_names(&name).await.unwrap();
+    let saved_data = node_service::get_node_by_names(&name).await.unwrap();
     assert!(saved_data.is_empty());
 }
 
@@ -369,7 +369,7 @@ async fn test_delete_server_cancel() {
     p.exp_eof().unwrap();
 
     // check saved data
-    let saved_data = node_service::get_server_by_names(&name).await.unwrap();
+    let saved_data = node_service::get_node_by_names(&name).await.unwrap();
     assert_eq!(false, saved_data.is_empty());
 }
 

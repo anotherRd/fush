@@ -37,6 +37,10 @@ pub enum Commands {
     ShowKey {
         arg: Option<String>,
     },
+    #[command(alias = "sd", about = "(alias: sd) - show detail of a node\nusage: fush show-detail \"server: development1\" or wihtout argument to use selector\n")]
+    ShowDetail {
+        arg: Option<String>,
+    },
     #[cfg(debug_assertions)]
     Test,
 }

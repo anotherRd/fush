@@ -1,12 +1,13 @@
 use std::io::{self, Write};
 use crate::config::{key_dir, tmp_list_file};
 use crate::debug_println;
+use crate::dto::node_dto::NodeDto;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::fs::File;
 use crate::database::get_db_pool;
 use sqlx::Row;
-use std::fs;
+use std::{fs, println, vec};
 
 pub fn check_requirement() {
     // optional requirement
@@ -409,4 +410,88 @@ pub fn custom_print(message_type: &str, message: &str) {
             println!("{message}");
         }
     }
+}
+
+pub fn print_container_detail(container_name: &str) -> Result<(), Box<dyn std::error::Error>>{
+    let format = concat!("CONTAINER:\n",
+        "  Name: {{.Names}}\n",
+        "  ID: {{.ID}}\n",
+        "  Image: {{.Image}}\n",
+        "  Status: {{.Status}}\n",
+        "  Ports: {{.Ports}}",
+    );
+    let mut cmd = Command::new("docker");
+    cmd.args([
+            "ps",
+            "-f",
+            &format!("name=^{container_name}$"),
+            "--format",
+            format,
+        ]);
+
+    // print before executed
+    debug_println!("{:?}", cmd);
+    
+    let output = cmd.output()?;
+
+    let result = String::from_utf8(output.stdout)?;
+
+    println!("{result}");
+
+    Ok(())
+}
+
+pub fn print_server_detail(node_dto: &NodeDto) {
+    println!("SERVER:");
+    println!("  Name: {}", node_dto.name);
+    println!("  address: {}", node_dto.address);
+    if let Some(key) = &node_dto.key {
+        println!("  key: {}", key);
+
+    } else {
+        println!("  key: [default key]");
+    }
+}
+
+pub fn print_server_container_detail(node_dto: &NodeDto) -> Result<(), Box<dyn std::error::Error>> {
+    // docker command
+    let format = concat!("CONTAINER:\n",
+        "    Name: {{.Names}}\n",
+        "    ID: {{.ID}}\n",
+        "    Image: {{.Image}}\n",
+        "    Status: {{.Status}}\n",
+        "    Ports: {{.Ports}}",
+    );
+    let docker_command_arg = &format!(r#"docker ps -f name='^test_tracker-nginx-1$' --format '{}'"#, &format);
+    
+    // parent
+    if let Some(parent) = node_dto.parent.clone() {
+        // server command args
+        let key: Option<&str> = match &parent.key {
+            Some(key) => Some(&key),
+            None => None,
+        };
+        let ssh_args = connect_to_server_args(&key, &parent.address, &vec![&docker_command_arg])?;
+
+        println!("SERVER:");
+        println!("  Name: {}", parent.name);
+        println!("  address: {}", parent.address);
+        if let Some(key) = &parent.key {
+            println!("  key: {}", key);
+        } else {
+            println!("  key: [default key]");
+        }
+
+        // prepare command
+        let mut cmd = Command::new("ssh");
+        cmd.args(ssh_args);
+        
+        // print before executed
+        debug_println!("{:?}", cmd);
+
+        // execute
+        cmd.status()?;
+    }
+
+    Ok(())
 }
