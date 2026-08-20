@@ -191,18 +191,6 @@ pub fn connect_to_server_container(
 
     let shells = vec!["bash", "ash", "sh"];
     for shell in shells {
-        // let tmp_docker_command = format!("{docker_command} {shell}");
-        // let mut tmp_ssh_args = ssh_args.clone();
-        // tmp_ssh_args.push(tmp_docker_command);
-        
-        // let shell_status = Command::new("ssh")
-        //     .args(tmp_ssh_args)
-        //     .status()?;
-        
-        // if shell_status.success() {
-        //     break;
-        // }
-        
         // prepare shell check command
         let tmp_docker_command = format!("{docker_check_shell_command} {shell}");
         let mut tmp_ssh_args = ssh_args.clone();

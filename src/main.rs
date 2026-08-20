@@ -20,7 +20,11 @@ async fn add_server() -> Result<(), Box<dyn std::error::Error>> {
     let user = read_from_input("User", None, vec![], true)?;
     let host = read_from_input("Host", None, vec![], true)?;
     let port = read_from_input("Port (22)", Some("22"), vec![], true)?;
-    let key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
+    let mut key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
+    while key.ends_with(".pub") {
+        custom_print("info", &format!("key name end with .pub is not allowed"));
+        key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
+    }
     
     // save new node
     node_service::add_server(AddServerServiceParams {
@@ -59,11 +63,13 @@ async fn edit_server(selected: String) -> Result<(), Box<dyn std::error::Error>>
     };
     let change_key = read_from_input(&change_key_caption, None, vec!["y", "n"], true)?;
 
-    let key;
+    let mut key = node_dto.key.unwrap_or("".to_string());
     if change_key == "y" {
         key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
-    } else {
-        key = node_dto.key.unwrap_or("".to_string());
+        while key.ends_with(".pub") {
+            custom_print("info", &format!("key name end with .pub is not allowed"));
+            key = read_from_input("Custom key name (use default key/password if empty)", Some(""), vec![], false)?;
+        }
     }
 
     // save edit node
