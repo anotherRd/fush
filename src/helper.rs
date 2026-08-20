@@ -444,12 +444,12 @@ pub fn print_container_detail(container_name: &str) -> Result<(), Box<dyn std::e
 pub fn print_server_detail(node_dto: &NodeDto) {
     println!("SERVER:");
     println!("  Name: {}", node_dto.name);
-    println!("  address: {}", node_dto.address);
+    println!("  Address: {}", node_dto.address);
     if let Some(key) = &node_dto.key {
-        println!("  key: {}", key);
+        println!("  Key: {}", key);
 
     } else {
-        println!("  key: [default key]");
+        println!("  Key: [default key]");
     }
 }
 
@@ -462,7 +462,7 @@ pub fn print_server_container_detail(node_dto: &NodeDto) -> Result<(), Box<dyn s
         "    Status: {{.Status}}\n",
         "    Ports: {{.Ports}}",
     );
-    let docker_command_arg = &format!(r#"docker ps -f name='^test_tracker-nginx-1$' --format '{}'"#, &format);
+    let docker_command_arg = &format!(r#"docker ps -f name='^{}$' --format '{}'"#, &node_dto.address, &format);
     
     // parent
     if let Some(parent) = node_dto.parent.clone() {
