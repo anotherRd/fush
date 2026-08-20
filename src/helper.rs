@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use crate::config::{key_dir, tmp_list_file};
+use crate::debug_println;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::fs::File;
@@ -8,29 +9,39 @@ use sqlx::Row;
 use std::fs;
 
 pub fn check_requirement() {
-    let commands = vec![
-        "ssh",
-        "ssh-keygen",
+    // optional requirement
+    let optional = vec![
         "docker",
-        "fzf",
     ];
 
-    let missing: Vec<_> = commands
+    let optinal: Vec<_> = optional
         .into_iter()
         .filter(|command| which::which(command).is_err())
         .collect();
 
-    for command in &missing {
+    for command in &optinal {
+        custom_print("warning", &format!("missing: {command})"));
+    }
+
+    // mandatory requirement
+    let mandatory = vec![
+        "ssh",
+        "ssh-keygen",
+        "fzf",
+    ];
+
+    let mandatory: Vec<_> = mandatory
+        .into_iter()
+        .filter(|command| which::which(command).is_err())
+        .collect();
+
+    for command in &mandatory {
         custom_print("error", &format!("missing: {command})"));
     }
 
-    if missing.len() > 0 {
+    if mandatory.len() > 0 {
         std::process::exit(1);
     }
-}
-
-pub fn is_test() -> bool {
-    cfg!(test)
 }
 
 pub fn read_from_input(
@@ -125,7 +136,7 @@ pub fn connect_to_server(
     cmd.args(&ssh_args);
     
     // print before executed
-    println!("{:?}", cmd);
+    debug_println!("{:?}", cmd);
 
     // execute
     cmd.status()?;
@@ -150,7 +161,7 @@ pub fn connect_to_container(
         cmd.args(tmp_args);
         
         // print before executed
-        println!("{:?}", cmd);
+        debug_println!("{:?}", cmd);
 
         // execute
         let shell_status = cmd.status()?;
@@ -158,7 +169,7 @@ pub fn connect_to_container(
         // prepare connection command
         let mut connection_cmd = Command::new("docker");
         connection_cmd.args(["exec", "-it", &address, &shell]);
-        println!("{:?}", connection_cmd);
+        debug_println!("{:?}", connection_cmd);
         if shell_status.success() {
             connection_cmd.status()?;
             break;
@@ -201,7 +212,7 @@ pub fn connect_to_server_container(
         cmd.args(&tmp_ssh_args);
         
         // print before executed
-        println!("{:?}", cmd);
+        debug_println!("{:?}", cmd);
         
         // execute
         let shell_status = cmd.status()?;
@@ -214,7 +225,7 @@ pub fn connect_to_server_container(
         let mut connection_cmd = Command::new("ssh");
         connection_cmd.arg("-t");
         connection_cmd.args(tmp_ssh_args);
-        println!("{:?}", connection_cmd);
+        debug_println!("{:?}", connection_cmd);
         if shell_status.success() {
             connection_cmd.status()?;
             break;

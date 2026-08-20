@@ -1,5 +1,6 @@
 use clap::{Parser};
 use fush::custom_command::{Cli, Commands};
+use fush::debug_println;
 use std::{println, vec};
 use std::process::{Command};
 use fush::helper::{check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, custom_print, db_array_placeholders, key_pair_exists, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
@@ -215,7 +216,7 @@ async fn scan_server_container(scan_all: bool, selections: Vec<String>, fake_con
         // execute ssh
         let mut cmd = Command::new("ssh");
         cmd.args(ssh_args);
-        println!("{:?}", cmd);
+        debug_println!("{:?}", cmd);
         let output = cmd.output()?;
 
         // turn it to vec
@@ -290,7 +291,7 @@ async fn show_key(selected: String)-> Result<(), Box<dyn std::error::Error>> {
             let key_dir = key_dir()?;
             let key_path = format!("{}/{}.pub", &key_dir, &key_value);
             let key_content = fs::read_to_string(&key_path)?;
-            println!("Key path: {key_path}");
+            println!("Key location: {key_path}\n");
             println!("{key_content}");
         } else {
             custom_print("error", &format!("Key {key_value} not found"));

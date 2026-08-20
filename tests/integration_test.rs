@@ -555,3 +555,61 @@ async fn test_connect_to_server_container() {
     p.exp_regex(&format!(r#""ssh" "-t" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec -it fake-container-1 (?:bash|ash|sh)""#)).unwrap();
     p.exp_eof().unwrap();
 }
+
+#[tokio::test]
+async fn test_show_key() {
+    setup().await;
+
+    let name = "show_key";
+    let user = "user_show_key";
+    let host = "192.168.1.1";
+    let port = "11";
+    let key = "user_show_key_key";
+
+    // create server
+    node_service::add_server(AddServerServiceParams {
+        name: name.to_string(),
+        user: user.to_string(),
+        host: host.to_string(),
+        port: port.to_string(),
+        key: key.to_string(),
+        default_passphrase: Some("".to_string())
+    }).await.unwrap();
+
+    let key_location = format!("{}/{}.pub", &key_dir().unwrap(), &key);
+    let key_content = fs::read_to_string(&key_location).unwrap();
+
+    // scan
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!(r#"{binary} sk "server: {name}""#), Some(5_000)).unwrap();
+    p.exp_string(&format!("Key location: {}", &key_location)).unwrap();
+    p.exp_string(&key_content.trim()).unwrap();
+    p.exp_eof().unwrap();
+}
+
+#[tokio::test]
+async fn test_show_key_default_key() {
+    setup().await;
+
+    let name = "show_key_default_key";
+    let user = "user_show_key_default_key";
+    let host = "192.168.1.1";
+    let port = "11";
+    let key = "";
+
+    // create server
+    node_service::add_server(AddServerServiceParams {
+        name: name.to_string(),
+        user: user.to_string(),
+        host: host.to_string(),
+        port: port.to_string(),
+        key: key.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+
+    // scan
+    let binary = env!("CARGO_BIN_EXE_fush");
+    let mut p = spawn(&format!(r#"{binary} sk "server: {name}""#), Some(5_000)).unwrap();
+    p.exp_string("Info:     Use default keys").unwrap();
+    p.exp_eof().unwrap();
+}

@@ -6,3 +6,4 @@ pub mod dto;
 pub mod service;
 pub mod service_params;
 pub mod custom_command;
+pub mod macros;
