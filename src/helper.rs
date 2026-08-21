@@ -67,11 +67,12 @@ pub fn check_requirement() {
         .collect();
 
     for command in &optinal {
-        custom_print("warning", &format!("missing: {command})"));
+        custom_print("warning", &format!("missing: {command}"));
     }
 
     // mandatory requirement
     let mandatory = vec![
+        "sqlite3",
         "ssh",
         "ssh-keygen",
         "fzf",
@@ -83,10 +84,11 @@ pub fn check_requirement() {
         .collect();
 
     for command in &mandatory {
-        custom_print("error", &format!("missing: {command})"));
+        custom_print("error", &format!("missing: {command}"));
     }
 
     if mandatory.len() > 0 {
+        println!("Exit");
         std::process::exit(1);
     }
 }
