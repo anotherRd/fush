@@ -43,4 +43,6 @@ pub enum Commands {
     },
     #[cfg(debug_assertions)]
     Test,
+    #[cfg(debug_assertions)]
+    Prepare,
 }

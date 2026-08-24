@@ -85,7 +85,7 @@ async fn delete_server(selections: Vec<String>) -> Result<(), Box<dyn std::error
 
     // confirmation
     custom_print("warning", &format!("To be deleted:"));
-    println!("{:?}", &selections);
+    println!("[{}]", &selections.join(", "));
     let confirmation = read_from_input("Are you sure [y/n]?", None, vec!["y", "n"], true)?;
     if confirmation == "n" {
         return Ok(());
@@ -322,16 +322,21 @@ async fn show_detail(selected: String)-> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // check requirement
-    let _ = check_requirement();
+pub async fn prepare() -> Result<(), Box<dyn std::error::Error>> {
+    check_requirement()?;
 
     // init config
-    let _ = init_config()?;
+    init_config()?;
 
     // migrate db
-    let _ = migrate().await?;
+    migrate().await?;
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    prepare().await?;
 
     // command
     let cli = Cli::parse();
@@ -405,11 +410,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             show_detail(selected).await?;
         },
         #[cfg(debug_assertions)]
-        Commands::Test => {
-            Command::new("cargo")
+        Commands::Prepare =>  {
+            prepare().await?;
+        }
+        #[cfg(debug_assertions)]
+        Commands::Test =>  {
+            let status = Command::new("cargo")
+                .env("FUSH_TEST", "1")
+                .args(["run", "--", "prepare"])
+                .status()?;
+
+            if !status.success() {
+                return Err(format!("{status}").into());
+            }
+
+            let status = Command::new("cargo")
                 .env("FUSH_TEST", "1")
                 .args(["test", "--", "--test-threads", "1"])
                 .status()?;
+
+            if !status.success() {
+                return Err(format!("{status}").into());
+            }
         }
     }
 

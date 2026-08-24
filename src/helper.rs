@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use crate::config::{key_dir, tmp_list_file};
+use crate::config::{get_requirements, key_dir, tmp_list_file};
 use crate::debug_println;
 use crate::dto::node_dto::NodeDto;
 use std::path::Path;
@@ -54,13 +54,10 @@ impl Highlighter for AutocompleteHelper {}
 impl Validator for AutocompleteHelper {}
 impl Helper for AutocompleteHelper {}
 
-
-pub fn check_requirement() {
-    // optional requirement
-    let optional = vec![
-        "docker",
-    ];
-
+pub fn check_requirement() -> Result<(), Box<dyn std::error::Error>>{
+    // get requirement
+    let (mandatory, optional) = get_requirements();
+    
     let optinal: Vec<_> = optional
         .into_iter()
         .filter(|command| which::which(command).is_err())
@@ -70,27 +67,16 @@ pub fn check_requirement() {
         custom_print("warning", &format!("missing: {command}"));
     }
 
-    // mandatory requirement
-    let mandatory = vec![
-        "sqlite3",
-        "ssh",
-        "ssh-keygen",
-        "fzf",
-    ];
-
     let mandatory: Vec<_> = mandatory
         .into_iter()
         .filter(|command| which::which(command).is_err())
         .collect();
 
-    for command in &mandatory {
-        custom_print("error", &format!("missing: {command}"));
+    if mandatory.len() > 0 {
+        return Err(format!("Error: missing requirements: [{}]", mandatory.join(", ")).into());
     }
 
-    if mandatory.len() > 0 {
-        println!("Exit");
-        std::process::exit(1);
-    }
+    Ok(())
 }
 
 pub fn read_from_input(
@@ -212,13 +198,13 @@ pub fn connect_to_container(
         // print before executed
         debug_println!("{:?}", cmd);
 
-        // execute
-        let shell_status = cmd.status()?;
-        
         // prepare connection command
         let mut connection_cmd = Command::new("docker");
         connection_cmd.args(["exec", "-it", &address, &shell]);
         debug_println!("{:?}", connection_cmd);
+
+        // execute check docker shell
+        let shell_status = cmd.status()?;
         if shell_status.success() {
             connection_cmd.status()?;
             break;

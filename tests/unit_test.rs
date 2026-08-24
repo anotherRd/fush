@@ -1,12 +1,7 @@
 use std::{assert_eq, assert_ne, format, fs::{self, OpenOptions}};
 
-use fush::{config::{key_dir}, helper::{create_key_pair, key_pair_exists}};
+use fush::{config::key_dir, helper::{check_requirement, create_key_pair, key_pair_exists}};
 use tokio::sync::OnceCell;
-
-// create key pair if file not exists
-// create key pair is not complete
-// create key pair if exists but overwrite is true
-// dont create key pair if overwrite is false
 
 static SETUP: OnceCell<()> = OnceCell::const_new();
 
@@ -40,6 +35,14 @@ fn read_file_dummy(name: &str) -> String {
     let key_path = format!("{key_dir}/{name}");
     let key_content = fs::read_to_string(&key_path).unwrap();
     key_content
+}
+
+#[tokio::test]
+async fn test_requirement_installed() {
+    setup().await;
+
+    let check_requirement = check_requirement();
+    assert!(check_requirement.is_ok());
 }
 
 #[tokio::test]

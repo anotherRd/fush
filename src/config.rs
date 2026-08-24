@@ -76,3 +76,18 @@ pub fn tmp_list_file() -> String {
     let tmp_dir = tmp_dir();
     return format!("{}/list", &tmp_dir);
 }
+
+pub fn get_requirements() -> (Vec<String>, Vec<String>) {
+    let mandatory = vec![
+        "sqlite3".to_string(),
+        "ssh".to_string(),
+        "ssh-keygen".to_string(),
+        "fzf".to_string(),
+    ];
+
+    let optional = vec![
+        "docker".to_string(),
+    ];
+
+    (mandatory, optional)
+}

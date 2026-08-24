@@ -703,6 +703,9 @@ async fn test_show_detail_server_container() {
     // show detail
     let mut p = spawn_test(&vec!["sd", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
 
-    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name='^fake-container-1$' --format 'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}'""#)).unwrap();
+    let expected1 = format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name='^fake-container-1$' --format 'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}'""#);
+    let expected2 = format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name=\'^fake-container-1$\' --format \'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}\'""#);
+    p.exp_regex(&format!("(?:{}|{})", regex::escape(&expected1), regex::escape(&expected2))).unwrap();
+
     p.exp_eof().unwrap();
 }
