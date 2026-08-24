@@ -332,6 +332,48 @@ pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Er
             writeln!(file, "container: {container}")?;
         }
     }
+    
+    // windows only
+    if cfg!(target_os = "windows") {
+        // wsl
+        if let Ok(output) = Command::new("wsl").args(["-l", "-q"]).output() {
+            // turn it to vec
+            let stdout = String::from_utf16_lossy(
+                &output.stdout
+                    .chunks_exact(2)
+                    .map(|x| u16::from_le_bytes([x[0], x[1]]))
+                    .collect::<Vec<_>>()
+            );
+
+            let wsls: Vec<String> = stdout
+                .lines()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect();
+
+        
+            // write to tmp file
+            for wsl in &wsls {
+                writeln!(file, "wsl: {wsl}")?;
+            }
+            
+            // get wsl container
+            for wsl in &wsls {
+                // turn it to vec
+                if let Ok(output_container) = Command::new("wsl").args(["-d", &wsl, "--", "sh", "-c", "docker ps --format {{.Names}}"]).output() {
+                    let wsls_containers: Vec<String> = String::from_utf8_lossy(&output_container.stdout)
+                        .lines()
+                        .map(String::from)
+                        .collect();
+
+                    for container in &wsls_containers {
+                        writeln!(file, "wsl container: {wsl}: {container}")?;
+                    }
+                }
+            }
+        }
+    }
 
     // get nodes
     let pool = get_db_pool().await?;
@@ -599,4 +641,79 @@ pub fn auto_complete_key(
     }
 
     Ok(trimmed_input.to_string())
+}
+
+pub fn connect_to_wsl_args<'a>(
+    address: &'a str,
+    additional_args: &Vec<&'a str>
+) -> Result<Vec<&'a str>, Box<dyn std::error::Error>> { 
+    let mut wsl_args = vec![
+        "-d",
+        address,
+    ];
+    wsl_args.extend(additional_args);
+
+    Ok(wsl_args)
+}
+
+pub fn connect_to_wsl(
+    address: &str,
+    additional_args: &Vec<&str>
+) -> Result<(), Box<dyn std::error::Error>> { 
+    // prepare command
+    let wsl_args = connect_to_wsl_args(&address, &additional_args)?;
+    let mut cmd = Command::new("wsl");
+    cmd.args(&wsl_args);
+    
+    // print before executed
+    debug_println!("{:?}", cmd);
+
+    // execute
+    cmd.status()?;
+    
+    Ok(())
+}
+
+pub fn connect_to_wsl_container(
+    address: &str,
+    wsl_address: &str,
+    additional_args: &Vec<&str>
+) -> Result<(), Box<dyn std::error::Error>> { 
+    // prepare command
+    let mut wsl_args = connect_to_wsl_args(&wsl_address, &additional_args)?;
+    wsl_args.extend(["--", "sh", "-c"]);
+    
+    // check available container shell
+    let docker_command = format!("docker exec -it {address}");
+    let docker_check_shell_command = format!("docker exec {address} sh -c");
+
+    
+    let shells = vec!["bash", "ash", "sh"];
+    for shell in shells {
+        let tmp_docker_command = format!("{docker_check_shell_command} {shell}");
+        
+        let mut tmp_wsl_args = wsl_args.clone();
+        tmp_wsl_args.push(&tmp_docker_command);
+
+        let mut cmd = Command::new("wsl");
+        cmd.args(&tmp_wsl_args);
+
+        // print before executed
+        debug_println!("{:?}", cmd);
+        
+        // execute
+        let tmp_wsl_args = wsl_args.clone();
+        let mut connection_cmd = Command::new("wsl");
+        connection_cmd.args(tmp_wsl_args);
+        connection_cmd.arg(&format!("{docker_command} {shell}"));
+        debug_println!("{:?}", connection_cmd);
+
+        let shell_status = cmd.status()?;
+        if shell_status.success() {
+            connection_cmd.status()?;
+            break;
+        }
+    }
+    
+    Ok(())
 }

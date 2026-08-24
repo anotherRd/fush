@@ -3,7 +3,7 @@ use fush::custom_command::{Cli, Commands};
 use fush::debug_println;
 use std::{println, vec};
 use std::process::{Command};
-use fush::helper::{auto_complete_key, check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, custom_print, db_array_placeholders, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
+use fush::helper::{auto_complete_key, check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, connect_to_wsl, connect_to_wsl_container, custom_print, db_array_placeholders, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
 use fush::config::{is_test, key_dir};
 use fush::migration::migrate;
 use fush::database::get_db_pool;
@@ -154,6 +154,15 @@ async fn connect(selected: String)-> Result<(), Box<dyn std::error::Error>> {
             
             // execute ssh
             connect_to_server_container(&container_address, &server_key, &server_address, vec![])?;
+        },
+        "wsl" => {
+            // execute docker exec
+            connect_to_wsl(&selected, &vec![])?;
+        },
+        "wsl container" => {
+            // execute docker exec
+            let (wsl_address, container) = split_selected(&selected);
+            connect_to_wsl_container(&container, &wsl_address, &vec![])?;
         },
         _ => ()
     }
