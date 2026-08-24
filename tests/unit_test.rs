@@ -1,4 +1,4 @@
-use std::{assert_eq, assert_ne, format, fs::{self, OpenOptions}};
+use std::{assert_eq, assert_ne, fs::{self, OpenOptions}};
 
 use fush::{config::key_dir, helper::{check_requirement, create_key_pair, key_pair_exists}};
 use tokio::sync::OnceCell;
@@ -22,17 +22,17 @@ async fn setup() {
 }
 
 fn create_file_dummy(name: &str) {
-    let key_dir = key_dir().unwrap();
+    let key_dir = key_dir().unwrap().join(name);
     OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&format!("{key_dir}/{name}")).unwrap();
+        .open(key_dir).unwrap();
 }
 
 fn read_file_dummy(name: &str) -> String {
     let key_dir = key_dir().unwrap();
-    let key_path = format!("{key_dir}/{name}");
+    let key_path = key_dir.join(name);
     let key_content = fs::read_to_string(&key_path).unwrap();
     key_content
 }

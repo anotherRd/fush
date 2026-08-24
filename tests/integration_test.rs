@@ -468,12 +468,13 @@ async fn test_connect_to_server() {
         default_passphrase: Some("".to_string())
     }).await.unwrap();
 
-    let key_dir = key_dir().unwrap();
+    let key_dir = key_dir().unwrap().join(key);
+    let key_path = format!("{}", key_dir.display());
 
     // connect
     let mut p = spawn_test(&vec!["c", &format!("server: {name}")], Some(5_000)).unwrap();
 
-    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-i" "{key_dir}/{key}""#)).unwrap();
+    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-i" "{key_path}""#)).unwrap();
     p.exp_eof().unwrap();
 }
 
@@ -571,7 +572,7 @@ async fn test_show_key() {
         default_passphrase: Some("".to_string())
     }).await.unwrap();
 
-    let key_location = format!("{}/{}.pub", &key_dir().unwrap(), &key);
+    let key_location = format!("{}.pub", &key_dir().unwrap().join(&key).display());
     let key_content = fs::read_to_string(&key_location).unwrap();
 
     // show key

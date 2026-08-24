@@ -147,8 +147,8 @@ pub fn connect_to_server_args<'a>(
     // check if using key or password
     if let Some(key) = &key {
         if key_pair_exists(&key)? {
-            let key_dir = key_dir()?;
-            let key_path = format!("{}/{}", &key_dir, &key);
+            let key_dir = key_dir()?.join(key);
+            let key_path = format!("{}", key_dir.display());
             ssh_args.extend(["-i".to_string(), key_path.to_string()]);
         }
     }
@@ -245,13 +245,30 @@ pub fn connect_to_server_container(
         let mut tmp_ssh_args = ssh_args.clone();
         tmp_ssh_args.push(tmp_docker_command);
         
-        let mut connection_cmd = Command::new("ssh");
-        connection_cmd.arg("-t");
-        connection_cmd.args(tmp_ssh_args);
-        debug_println!("{:?}", connection_cmd);
-        if shell_status.success() {
-            connection_cmd.status()?;
-            break;
+        if cfg!(target_os = "linux") {
+            let mut connection_cmd = Command::new("ssh");
+            connection_cmd.arg("-t");
+            connection_cmd.args(tmp_ssh_args);
+            debug_println!("{:?}", connection_cmd);
+            if shell_status.success() {
+                connection_cmd.status()?;
+                break;
+            }
+        } else if cfg!(target_os = "windows") {
+            let mut connection_cmd = Command::new("cmd.exe");
+            connection_cmd.args([
+                "/c",
+                "start",
+                "powershell.exe",
+                "-NoExit",
+                "-Command",
+            ]);
+            connection_cmd.arg(&format!("ssh -t {}", tmp_ssh_args.join(" ")));
+            debug_println!("{:?}", connection_cmd);
+            if shell_status.success() {
+                connection_cmd.spawn()?;
+                break;
+            }
         }
     }
 
@@ -377,15 +394,15 @@ pub async fn select_multi_server(title: &str) -> Result <Vec<String>, Box<dyn st
 
 pub fn key_pair_exists(key: &str) -> Result<bool, Box<dyn std::error::Error>> {
     let key_dir = key_dir()?;
-    let key_path = format!("{}/{}", &key_dir, &key);
-    let pub_key_path = format!("{}/{}.pub", &key_dir, &key);
+    let key_path = format!("{}", key_dir.join(&key).display());
+    let pub_key_path = format!("{}.pub", key_dir.join(&key).display());
     return Ok(Path::new(&key_path).exists() && Path::new(&pub_key_path).exists());
 }
 
 pub fn create_key_pair(key: &str, overwrite: bool, default_passphrase: Option<String>) -> Result<bool, Box<dyn std::error::Error>> {
     let key_dir = key_dir()?;
-    let key_path = format!("{}/{}", &key_dir, &key);
-    let pub_key_path = format!("{}/{}.pub", &key_dir, &key);
+    let key_path = format!("{}", key_dir.join(&key).display());
+    let pub_key_path = format!("{}.pub", key_dir.join(&key).display());
 
     // if key pair exists and overwrite false return false
     if key_pair_exists(&key)? && !overwrite {
@@ -401,7 +418,7 @@ pub fn create_key_pair(key: &str, overwrite: bool, default_passphrase: Option<St
         fs::remove_file(&pub_key_path)?;
     }
 
-    let key_location = format!("{}/{}", &key_dir, &key);
+    let key_location = format!("{}", key_dir.join(&key).display());
     let mut keygen_args = vec!["-f", &key_location];
     let passphare;
     if let Some(default_passphrase_value) = default_passphrase {

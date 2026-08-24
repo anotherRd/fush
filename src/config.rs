@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{fs};
 
 pub fn is_test() -> bool {
@@ -10,39 +10,35 @@ pub fn app_name() -> String {
     "fush".to_string()
 }
 
-pub fn config_dir() -> Result<String, Box<dyn std::error::Error>> {
+pub fn config_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     // get config dir
     let config_dir;
     if is_test() {
-        let dir = std::env::temp_dir().to_string_lossy().to_string();
-        config_dir = format!("{}/{}_test", &dir, &app_name());
+        let dir = std::env::temp_dir().join(format!("{}_test", &app_name()));
+        config_dir = dir;
     } else {
         let dir = dirs::config_dir()
             .ok_or("Config directory not found")?
-            .to_string_lossy()
-            .to_string();
-        config_dir = format!("{}/{}", &dir, &app_name());
+            .join(format!("{}", &app_name()));
+        config_dir = dir;
     }
     
-
     Ok(config_dir)
 }
 
-pub fn tmp_dir() -> String {
-    let tmp_dir = std::env::temp_dir().to_string_lossy().to_string();
-    return format!("/{}/{}", &tmp_dir, &app_name());
+pub fn tmp_dir() -> PathBuf {
+    let tmp_dir = std::env::temp_dir();
+    return tmp_dir;
 }
 
-pub fn db_file() -> Result<String, Box<dyn std::error::Error>> {
-    return Ok(
-        format!("{}/data.db", &config_dir()?)
-    );
+pub fn db_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let path = config_dir()?.join("data.db");
+    return Ok(path);
 }
 
-pub fn key_dir() -> Result<String, Box<dyn std::error::Error>> {
-    return Ok(
-        format!("{}/keys", &config_dir()?)
-    );
+pub fn key_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let path = config_dir()?.join("keys");
+    return Ok(path);
 }
 
 pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,9 +68,9 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn tmp_list_file() -> String {
-    let tmp_dir = tmp_dir();
-    return format!("{}/list", &tmp_dir);
+pub fn tmp_list_file() -> PathBuf {
+    let tmp_dir = tmp_dir().join("list");
+    return tmp_dir;
 }
 
 pub fn get_requirements() -> (Vec<String>, Vec<String>) {

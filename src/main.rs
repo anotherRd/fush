@@ -1,4 +1,4 @@
-use clap::{Parser};
+use clap::{CommandFactory, Parser};
 use fush::custom_command::{Cli, Commands};
 use fush::debug_println;
 use std::{println, vec};
@@ -279,8 +279,8 @@ async fn show_key(selected: String)-> Result<(), Box<dyn std::error::Error>> {
     let node_dto = find_node_by_name(&selected_name).await?;
     if let Some(key_value) = &node_dto.key {
         if key_pair_exists(&key_value)? {
-            let key_dir = key_dir()?;
-            let key_path = format!("{}/{}.pub", &key_dir, &key_value);
+            let key_dir = key_dir()?.join(&key_value);
+            let key_path = format!("{}.pub", key_dir.display());
             let key_content = fs::read_to_string(&key_path)?;
             println!("Key location: {key_path}\n");
             println!("{key_content}");
@@ -323,6 +323,7 @@ async fn show_detail(selected: String)-> Result<(), Box<dyn std::error::Error>> 
 }
 
 pub async fn prepare() -> Result<(), Box<dyn std::error::Error>> {
+    // check requirement
     check_requirement()?;
 
     // init config
@@ -341,7 +342,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // command
     let cli = Cli::parse();
     match cli.command {
-        Commands::Conenct { arg } => {
+        Some(Commands::Conenct { arg }) => {
             let selected;
             if let Some(selected_value) = arg {
                 selected = selected_value;
@@ -350,10 +351,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             connect(selected).await?;
         },
-        Commands::Add => {
+        Some(Commands::Add) => {
             add_server().await?;
         },
-        Commands::Edit { arg } => {
+        Some(Commands::Edit { arg }) => {
             let selected;
             if let Some(selected_value) = arg {
                 selected = selected_value;
@@ -362,7 +363,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             edit_server(selected).await?;
         },
-        Commands::Delete { args } => {
+        Some(Commands::Delete { args }) => {
             let selections;
             if !args.is_empty() {
                 selections = args;
@@ -371,7 +372,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             delete_server(selections).await?;
         },
-        Commands::Scan { args, mut fake_container } => {
+        Some(Commands::Scan { args, mut fake_container }) => {
             if !is_test() {
                 fake_container = vec![];
             }
@@ -384,14 +385,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             scan_server_container(false, selections, fake_container).await?;
         },
-        Commands::ScanAll {mut fake_container} => {
+        Some(Commands::ScanAll {mut fake_container}) => {
             if !is_test() {
                 fake_container = vec![];
             }
 
             scan_server_container(true, vec![], fake_container).await?;
         },
-        Commands::ShowKey { arg } => {
+        Some(Commands::ShowKey { arg }) => {
             let selected;
             if let Some(selected_value) = arg {
                 selected = selected_value;
@@ -400,7 +401,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             show_key(selected).await?;
         }
-        Commands::ShowDetail { arg } => {
+        Some(Commands::ShowDetail { arg }) => {
             let selected;
             if let Some(selected_value) = arg {
                 selected = selected_value;
@@ -410,11 +411,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             show_detail(selected).await?;
         },
         #[cfg(debug_assertions)]
-        Commands::Prepare =>  {
+        Some(Commands::Prepare) =>  {
             prepare().await?;
         }
         #[cfg(debug_assertions)]
-        Commands::Test =>  {
+        Some(Commands::Test) =>  {
             let status = Command::new("cargo")
                 .env("FUSH_TEST", "1")
                 .args(["run", "--", "prepare"])
@@ -433,6 +434,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err(format!("{status}").into());
             }
         }
+        None => Cli::command().print_help()?
     }
 
     Ok(())
