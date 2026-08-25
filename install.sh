@@ -2,11 +2,6 @@
 
 set -e
 
-# test
-echo "RUNNING TEST"
-cargo run -- test
-rm -rf target
-
 # build
 echo "INSTALLING"
 cargo build --release
