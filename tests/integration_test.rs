@@ -615,7 +615,7 @@ async fn test_show_detail_container() {
     let name = "show_detail_container";
 
     // show detail
-    let mut p = spawn_test(&vec!["sd", &format!("container: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("container: {name}")], Some(5_000)).unwrap();
     p.exp_string(&format!(r#""docker" "ps" "-f" "name=^{name}$" "--format" "CONTAINER:\n  Name: {{{{.Names}}}}\n  ID: {{{{.ID}}}}\n  Image: {{{{.Image}}}}\n  Status: {{{{.Status}}}}\n  Ports: {{{{.Ports}}}}""#)).unwrap();
     p.exp_eof().unwrap();
 }
@@ -641,7 +641,7 @@ async fn test_show_detail_server_default_key() {
     }).await.unwrap();
 
     // show detail
-    let mut p = spawn_test(&vec!["sd", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("server: {name}")], Some(5_000)).unwrap();
     p.exp_string(&format!("Name: {name}")).unwrap();
     p.exp_string(&format!("Address: {user}@{host}:{port}")).unwrap();
     p.exp_string(&format!("Key: [default key]")).unwrap();
@@ -669,7 +669,7 @@ async fn test_show_detail_server_custom_key() {
     }).await.unwrap();
 
     // show detail
-    let mut p = spawn_test(&vec!["sd", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("server: {name}")], Some(5_000)).unwrap();
     p.exp_string(&format!("Name: {name}")).unwrap();
     p.exp_string(&format!("Address: {user}@{host}:{port}")).unwrap();
     p.exp_string(&format!("Key: {key}")).unwrap();
@@ -702,7 +702,7 @@ async fn test_show_detail_server_container() {
     p.exp_eof().unwrap();
 
     // show detail
-    let mut p = spawn_test(&vec!["sd", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
 
     let expected1 = format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name='^fake-container-1$' --format 'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}'""#);
     let expected2 = format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name=\'^fake-container-1$\' --format \'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}\'""#);
