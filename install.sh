@@ -10,5 +10,4 @@ cargo build --release
 sudo mkdir -p "/usr/local/bin/"
 sudo cp target/release/fush "/usr/local/bin/fush"
 sudo chmod 755 "/usr/local/bin/fush"
-rm -rf target
 echo "Successfully installed to /usr/local/bin/fush"

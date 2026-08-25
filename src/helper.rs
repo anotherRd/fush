@@ -278,7 +278,7 @@ pub fn connect_to_server_container(
 
 pub fn multi_selection(title: &str) -> Result <Vec<String>, Box<dyn std::error::Error>> { 
     // start fzf
-    let file = File::open(&tmp_list_file())?;
+    let file = File::open(&tmp_list_file()?)?;
     let output = Command::new("fzf")
         .arg("--multi")
         .arg(&format!("--header={title}"))
@@ -296,7 +296,7 @@ pub fn multi_selection(title: &str) -> Result <Vec<String>, Box<dyn std::error::
 
 pub fn selection(title: &str) -> Result <String, Box<dyn std::error::Error>> { 
     // start fzf
-    let file = File::open(&tmp_list_file())?;
+    let file = File::open(&tmp_list_file()?)?;
     let output = Command::new("fzf")
         .arg(&format!("--header={title}"))
         .stdin(Stdio::from(file))
@@ -317,7 +317,7 @@ pub fn db_array_placeholders(data_length: usize) -> String {
 }
 
 pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file())?;
+    let mut file = File::create(&tmp_list_file()?)?;
 
     // get local active container
     if let Ok(output) = Command::new("docker").args(["ps", "--format", "{{.Names}}"]).output() {
@@ -395,7 +395,7 @@ pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Er
 }
 
 pub async fn select_server(title: &str) -> Result <String, Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file())?;
+    let mut file = File::create(&tmp_list_file()?)?;
     let pool = get_db_pool().await?;
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
         .fetch_all(&pool)
@@ -415,7 +415,7 @@ pub async fn select_server(title: &str) -> Result <String, Box<dyn std::error::E
 }
 
 pub async fn select_multi_server(title: &str) -> Result <Vec<String>, Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file())?;
+    let mut file = File::create(&tmp_list_file()?)?;
     let pool = get_db_pool().await?;
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
         .fetch_all(&pool)

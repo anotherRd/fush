@@ -1,4 +1,5 @@
 use std::fs::OpenOptions;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::{fs};
 
@@ -27,7 +28,7 @@ pub fn config_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
 }
 
 pub fn tmp_dir() -> PathBuf {
-    let tmp_dir = std::env::temp_dir();
+    let tmp_dir = std::env::temp_dir().join("fush");
     return tmp_dir;
 }
 
@@ -59,7 +60,11 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
     // create tmp dir if not exists
     let tmp_dir = tmp_dir();
     let tmp_dir_path = Path::new(&tmp_dir);
-    fs::create_dir_all(tmp_dir_path)?;
+    if !tmp_dir.exists() {
+        fs::create_dir_all(tmp_dir_path)?;
+        fs::set_permissions(tmp_dir_path, fs::Permissions::from_mode(0o777))?;
+    }
+
     
     // create db file if not exists
     OpenOptions::new()
@@ -75,9 +80,10 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn tmp_list_file() -> PathBuf {
-    let tmp_dir = tmp_dir().join("list");
-    return tmp_dir;
+pub fn tmp_list_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let username = std::env::var("USERNAME").or_else(|_| std::env::var("USER"))?;
+    let tmp_dir = tmp_dir().join(&username);
+    return Ok(tmp_dir);
 }
 
 pub fn get_requirements() -> (Vec<String>, Vec<String>) {
