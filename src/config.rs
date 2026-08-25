@@ -1,5 +1,4 @@
 use std::fs::OpenOptions;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::{fs};
 
@@ -62,7 +61,10 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
     let tmp_dir_path = Path::new(&tmp_dir);
     if !tmp_dir.exists() {
         fs::create_dir_all(tmp_dir_path)?;
-        fs::set_permissions(tmp_dir_path, fs::Permissions::from_mode(0o777))?;
+        #[cfg(target_os = "linux")] {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(tmp_dir_path, fs::Permissions::from_mode(0o777))?;
+        }
     }
 
     

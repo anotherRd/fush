@@ -3,7 +3,7 @@ use fush::custom_command::{Cli, Commands};
 use fush::debug_println;
 use std::{println, vec};
 use std::process::{Command};
-use fush::helper::{auto_complete_key, check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, connect_to_wsl, connect_to_wsl_container, custom_print, db_array_placeholders, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
+use fush::helper::{auto_complete_key, check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, connect_to_wsl, connect_to_wsl_container, custom_print, db_array_placeholders, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, print_wsl_container_detail, print_wsl_detail, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
 use fush::config::{is_test, key_dir};
 use fush::migration::migrate;
 use fush::database::get_db_pool;
@@ -304,7 +304,7 @@ async fn show_key(selected: String)-> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn show_detail(selected: String)-> Result<(), Box<dyn std::error::Error>> {
+async fn show_info(selected: String)-> Result<(), Box<dyn std::error::Error>> {
     // return if nothing is selected
     if selected == "" {
         return Ok(())
@@ -323,6 +323,13 @@ async fn show_detail(selected: String)-> Result<(), Box<dyn std::error::Error>> 
         "server container" => {
             let node_dto = find_node_by_name(&selected_name).await?;
             print_server_container_detail(&node_dto)?;
+        },
+        "wsl" => {
+            print_wsl_detail(&selected_name)?;
+        },
+        "wsl container" => {
+            let (wsl_name, container) = split_selected(&selected_name);
+            print_wsl_container_detail(&container, &wsl_name)?;
         },
         _ => ()
     }
@@ -410,14 +417,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             show_key(selected).await?;
         }
-        Some(Commands::ShowDetail { arg }) => {
+        Some(Commands::ShowInfo { arg }) => {
             let selected;
             if let Some(selected_value) = arg {
                 selected = selected_value;
             } else {
-                selected = select_nodes("Select a node to show the detail").await?;
+                selected = select_nodes("Select a node to show info").await?;
             }
-            show_detail(selected).await?;
+            show_info(selected).await?;
         },
         #[cfg(debug_assertions)]
         Some(Commands::Prepare) =>  {

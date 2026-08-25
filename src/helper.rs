@@ -717,3 +717,91 @@ pub fn connect_to_wsl_container(
     
     Ok(())
 }
+
+pub fn get_wsl_list() -> Result<Vec<Vec<String>>, Box<dyn std::error::Error>> {
+    let mut result = vec![];
+    let output = Command::new("wsl")
+        .args(["--list", "--verbose"])
+        .output()?;
+
+    let stdout = String::from_utf16_lossy(
+        &output
+            .stdout
+            .chunks_exact(2)
+            .map(|x| u16::from_le_bytes([x[0], x[1]]))
+            .collect::<Vec<_>>(),
+    );
+
+    for line in stdout.lines().skip(1) {
+        let line = line.trim();
+
+        if line.is_empty() {
+            continue;
+        }
+
+        let line = line.strip_prefix('*').unwrap_or(line).trim();
+
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 3 {
+            let wsl_version = parts.last().unwrap();
+            let state = parts[parts.len() - 2];
+            let distro = parts[..parts.len() - 2].join(" ");
+
+            result.push(vec![distro, state.to_string(), wsl_version.to_string()]);
+        }
+    }
+
+    Ok(result)
+}
+
+pub fn print_wsl_detail(wsl_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let wsls = get_wsl_list()?;
+    
+    for wsl in wsls {
+        if wsl[0] == wsl_name {
+            println!("WSL:");
+            println!("  Distro: {}", wsl[0]);
+            println!("  State: {}", wsl[1]);
+            println!("  WSL Version: {}", wsl[2]);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn print_wsl_container_detail(
+    container: &str,
+    wsl_name: &str
+) -> Result<(), Box<dyn std::error::Error>> {
+    let wsls = get_wsl_list()?;
+    
+    for wsl in wsls {
+        if wsl[0] == wsl_name {
+            println!("WSL:");
+            println!("  Distro: {}", wsl[0]);
+            println!("  State: {}", wsl[1]);
+            println!("  WSL Version: {}", wsl[2]);
+
+            let format = concat!("CONTAINER:\n",
+                "    Name: {{.Names}}\n",
+                "    ID: {{.ID}}\n",
+                "    Image: {{.Image}}\n",
+                "    Status: {{.Status}}\n",
+                "    Ports: {{.Ports}}",
+            );
+            let docker_command_arg = &format!(r#"docker ps -f name='^{}$' --format '{}'"#, &container, &format);
+            
+            let mut wsl_args = connect_to_wsl_args(&wsl_name, &vec![])?;
+            wsl_args.extend(["--", "sh", "-c"]);
+
+            let mut cmd = Command::new("wsl");
+            cmd.args(wsl_args);
+            cmd.arg(&docker_command_arg);
+
+            cmd.status()?;
+
+        }
+    }
+
+    Ok(())
+}
