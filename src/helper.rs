@@ -336,39 +336,23 @@ pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Er
     // windows only
     if cfg!(target_os = "windows") {
         // wsl
-        if let Ok(output) = Command::new("wsl").args(["-l", "-q"]).output() {
-            // turn it to vec
-            let stdout = String::from_utf16_lossy(
-                &output.stdout
-                    .chunks_exact(2)
-                    .map(|x| u16::from_le_bytes([x[0], x[1]]))
-                    .collect::<Vec<_>>()
-            );
-
-            let wsls: Vec<String> = stdout
-                .lines()
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .map(String::from)
-                .collect();
-
-        
+        if let Ok(wsls) = get_wsl_list() {
             // write to tmp file
             for wsl in &wsls {
-                writeln!(file, "wsl: {wsl}")?;
+                writeln!(file, "wsl: {}", wsl[0])?;
             }
             
             // get wsl container
             for wsl in &wsls {
-                // turn it to vec
-                if let Ok(output_container) = Command::new("wsl").args(["-d", &wsl, "--", "sh", "-c", "docker ps --format {{.Names}}"]).output() {
+                // if wsl is active write to file
+                if wsl[1] == "Running" && let Ok(output_container) = Command::new("wsl").args(["-d", &wsl[0], "--", "sh", "-c", "docker ps --format {{.Names}}"]).output() {
                     let wsls_containers: Vec<String> = String::from_utf8_lossy(&output_container.stdout)
                         .lines()
                         .map(String::from)
                         .collect();
 
                     for container in &wsls_containers {
-                        writeln!(file, "wsl container: {wsl}: {container}")?;
+                        writeln!(file, "wsl container: {}: {container}", wsl[0])?;
                     }
                 }
             }
