@@ -1,5 +1,5 @@
-use fush::{helper::key_pair_exists, service::node_service, service_params::node_service_params::AddServerServiceParams};
-use rexpect::{error::Error, session::spawn_command};
+use fush::{helper::key_pair_exists, service::node_service::{self, get_blacklisted_key_name}, service_params::node_service_params::AddServerServiceParams};
+use rexpect::{error::Error, process::Signal, session::{PtySession, spawn_command}};
 use sqlx::Row;
 use tokio::sync::OnceCell;
 use fush::database::get_db_pool;
@@ -42,6 +42,51 @@ fn spawn_test(args: &Vec<&str>, timeout_ms: Option<u64>) -> Result<rexpect::sess
     spawn_command(cmd, timeout_ms)
 }
 
+fn exp_string_assert(
+    result: Result<String, rexpect::error::Error>,
+    p: &mut PtySession,
+    file: &str,
+    line: u32,
+    column: u32,
+) {
+    if let Err(error) = result {
+        p.process_mut().kill(Signal::SIGKILL).unwrap();
+        panic!("actual panicked at {file}:{line}:{column}\nExpected output was not found: {error:?}")
+    } else {
+        assert!(true);
+    }
+}
+
+fn send_line_assert(
+    result: Result<usize, rexpect::error::Error>,
+    p: &mut PtySession,
+    file: &str,
+    line: u32,
+    column: u32,
+) {
+    if let Err(error) = result {
+        p.process_mut().kill(Signal::SIGKILL).unwrap();
+        panic!("actual panicked at {file}:{line}:{column}\nSend line failed: {error:?}")
+    } else {
+        assert!(true);
+    }
+}
+
+fn eof_assert(
+    result: Result<String, rexpect::error::Error>,
+    p: &mut PtySession,
+    file: &str,
+    line: u32,
+    column: u32,
+) {
+    if let Err(error) = result {
+        p.process_mut().kill(Signal::SIGKILL).unwrap();
+        panic!("actual panicked at {file}:{line}:{column}\nEOF failed: {error:?}")
+    } else {
+        assert!(true);
+    }
+}
+
 #[tokio::test]
 async fn test_add_server() {
     setup().await;
@@ -54,28 +99,29 @@ async fn test_add_server() {
 
     let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
 
-    p.exp_string("Name: ").unwrap();
-    p.send_line(&name).unwrap();
+    exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
 
-    p.exp_string("User: ").unwrap();
-    p.send_line(&user).unwrap();
+    exp_string_assert(p.exp_string("User: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&user), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Host: ").unwrap();
-    p.send_line(&host).unwrap();
+    exp_string_assert(p.exp_string("Host: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&host), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Port (22): ").unwrap();
-    p.send_line(&port).unwrap();
+    exp_string_assert(p.exp_string("Port (22): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&port), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
-    p.send_line(&key).unwrap();
+    exp_string_assert(p.exp_string("Key name (create if not exists and use default key/password if empty): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&key), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Enter passphrase").unwrap();
-    p.send_line("").unwrap();
+    exp_string_assert(p.exp_string("Enter passphrase"), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(""), &mut p, file!(), line!(), column!());
     
-    p.exp_string("Enter same passphrase again:").unwrap();
-    p.send_line("").unwrap();
-    p.exp_string("Success:").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("Enter same passphrase again:"), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(""), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string("Success:"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check saved data
     let saved_data = node_service::find_node_by_name(&name).await.unwrap();
@@ -100,23 +146,24 @@ async fn test_add_server_default_value() {
 
     let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
 
-    p.exp_string("Name: ").unwrap();
-    p.send_line(&name).unwrap();
+    exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
 
-    p.exp_string("User: ").unwrap();
-    p.send_line(&user).unwrap();
+    exp_string_assert(p.exp_string("User: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&user), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Host: ").unwrap();
-    p.send_line(&host).unwrap();
+    exp_string_assert(p.exp_string("Host: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&host), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Port (22): ").unwrap();
-    p.send_line(&port).unwrap();
+    exp_string_assert(p.exp_string("Port (22): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&port), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
-    p.send_line(&key).unwrap();
+    exp_string_assert(p.exp_string("Key name (create if not exists and use default key/password if empty): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&key), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Success:").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("Success:"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check saved data
     let saved_data = node_service::find_node_by_name(&name).await.unwrap();
@@ -153,23 +200,52 @@ async fn test_add_server_duplicate_name() {
     // create node with same name
     let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
 
-    p.exp_string("Name: ").unwrap();
-    p.send_line(&name).unwrap();
+    exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Warning: {name} is already exists")), &mut p, file!(), line!(), column!());
+    
+    exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&format!("{name}2")), &mut p, file!(), line!(), column!());
 
-    p.exp_string("User: ").unwrap();
-    p.send_line(&user).unwrap();
+    exp_string_assert(p.exp_string("User: "), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Host: ").unwrap();
-    p.send_line(&host).unwrap();
+    p.process_mut().kill(Signal::SIGKILL).unwrap();
 
-    p.exp_string("Port (22): ").unwrap();
-    p.send_line(&port).unwrap();
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
+}
 
-    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
-    p.send_line(&key).unwrap();
+#[tokio::test]
+async fn test_add_server_blacklisted_key() {
+    setup().await;
 
-    p.exp_string("Error: Database(SqliteError { code: 2067").unwrap();
-    p.exp_eof().unwrap();
+    let name = "add_server_blacklisted_key";
+    let user = "user_add_server_blacklisted_key";
+    let host = "192.168.1.1";
+    let port = "";
+    let key = "authorized_keys";
+
+    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
+
+    exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string("User: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&user), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string("Host: "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&host), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string("Port (22): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&port), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string("Key name (create if not exists and use default key/password if empty): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&key), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string(&format!("Key name can't be on of [{}]", &get_blacklisted_key_name().join(", "))), &mut p, file!(), line!(), column!());
+    
+    p.process_mut().kill(Signal::SIGKILL).unwrap();
+
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -202,37 +278,38 @@ async fn test_edit_server() {
 
     let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
 
-    p.exp_string(&format!("Name ({name_before}): ")).unwrap();
-    p.send_line(&name_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name_after), &mut p, file!(), line!(), column!());
 
-    p.exp_string(&format!("User ({user_before}): ")).unwrap();
-    p.send_line(&user_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("User ({user_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&user_after), &mut p, file!(), line!(), column!());
 
-    p.exp_string(&format!("Host ({host_before}): ")).unwrap();
-    p.send_line(&host_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("Host ({host_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&host_after), &mut p, file!(), line!(), column!());
 
-    p.exp_string(&format!("Port ({port_before}): ")).unwrap();
-    p.send_line(&port_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("Port ({port_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&port_after), &mut p, file!(), line!(), column!());
     
     if key_before == "" {
-        p.exp_string(&format!("Change key [y/n]?: ")).unwrap();
-        p.send_line("y").unwrap();
+        exp_string_assert(p.exp_string(&format!("Change key [y/n]?: ")), &mut p, file!(), line!(), column!());
+        send_line_assert(p.send_line("y"), &mut p, file!(), line!(), column!());
     } else {
-        p.exp_string(&format!("Change key ({key_before}) [y/n]?: ")).unwrap();
-        p.send_line("y").unwrap();
+        exp_string_assert(p.exp_string(&format!("Change key ({key_before}) [y/n]?: ")), &mut p, file!(), line!(), column!());
+        send_line_assert(p.send_line("y"), &mut p, file!(), line!(), column!());
     }
 
-    p.exp_string("Key name (create if not exists and use default key/password if empty): ").unwrap();
-    p.send_line(&key_after).unwrap();
+    exp_string_assert(p.exp_string("Key name (create if not exists and use default key/password if empty): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&key_after), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Enter passphrase").unwrap();
-    p.send_line("").unwrap();
+    exp_string_assert(p.exp_string("Enter passphrase"), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(""), &mut p, file!(), line!(), column!());
     
-    p.exp_string("Enter same passphrase again:").unwrap();
-    p.send_line("").unwrap();
+    exp_string_assert(p.exp_string("Enter same passphrase again:"), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(""), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Success:").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("Success:"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check saved data
     let saved_data = node_service::find_node_by_name(&name_after).await.unwrap();
@@ -274,28 +351,29 @@ async fn test_edit_server_unchanged() {
 
     let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
 
-    p.exp_string(&format!("Name ({name_before}): ")).unwrap();
-    p.send_line(&name_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name_after), &mut p, file!(), line!(), column!());
 
-    p.exp_string(&format!("User ({user_before}): ")).unwrap();
-    p.send_line(&user_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("User ({user_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&user_after), &mut p, file!(), line!(), column!());
 
-    p.exp_string(&format!("Host ({host_before}): ")).unwrap();
-    p.send_line(&host_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("Host ({host_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&host_after), &mut p, file!(), line!(), column!());
 
-    p.exp_string(&format!("Port ({port_before}): ")).unwrap();
-    p.send_line(&port_after).unwrap();
+    exp_string_assert(p.exp_string(&format!("Port ({port_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&port_after), &mut p, file!(), line!(), column!());
     
     if key_before == "" {
-        p.exp_string(&format!("Change key [y/n]?: ")).unwrap();
-        p.send_line("n").unwrap();
+        exp_string_assert(p.exp_string(&format!("Change key [y/n]?: ")), &mut p, file!(), line!(), column!());
+        send_line_assert(p.send_line("n"), &mut p, file!(), line!(), column!());
     } else {
-        p.exp_string(&format!("Change key ({key_before}) [y/n]?: ")).unwrap();
-        p.send_line("n").unwrap();
+        exp_string_assert(p.exp_string(&format!("Change key ({key_before}) [y/n]?: ")), &mut p, file!(), line!(), column!());
+        send_line_assert(p.send_line("n"), &mut p, file!(), line!(), column!());
     }
 
-    p.exp_string("Success:").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("Success:"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check saved data
     let saved_data = node_service::find_node_by_name(&name_before).await.unwrap();
@@ -303,6 +381,109 @@ async fn test_edit_server_unchanged() {
     assert_eq!(format!("{user_before}@{host_before}:{port_before}"), saved_data.address);
     assert_eq!(None, saved_data.key);
     assert_eq!(None, saved_data.parent_id);
+}
+
+#[tokio::test]
+async fn test_edit_server_duplicate() {
+    setup().await;
+
+    let name_before = "edit_server_duplicate";
+    let user_before = "user_edit_server_duplicate";
+    let host_before = "192.168.1.1";
+    let port_before = "11";
+    let key_before = "";
+
+    // create first server
+    node_service::add_server(AddServerServiceParams {
+        name: name_before.to_string(),
+        user: user_before.to_string(),
+        host: host_before.to_string(),
+        port: port_before.to_string(),
+        key: key_before.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+    
+    // create second server
+    let name_second = "edit_server_duplicate2";
+    let user_second = "user_edit_server_duplicate2";
+    let host_second = "192.168.1.1";
+    let port_second = "11";
+    let key_second = "";
+    node_service::add_server(AddServerServiceParams {
+        name: name_second.to_string(),
+        user: user_second.to_string(),
+        host: host_second.to_string(),
+        port: port_second.to_string(),
+        key: key_second.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
+
+    exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name_second), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Warning: {name_second} is already exists")), &mut p, file!(), line!(), column!());
+    
+    exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&format!("{name_second}3")), &mut p, file!(), line!(), column!());
+    
+    exp_string_assert(p.exp_string(&format!("User ({user_before}): ")), &mut p, file!(), line!(), column!());
+
+    p.process_mut().kill(Signal::SIGKILL).unwrap();
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
+}
+
+#[tokio::test]
+async fn test_edit_server_blacklisted_key() {
+    setup().await;
+
+    let name_before = "edit_server_blacklisted_key";
+    let user_before = "user_edit_server_blacklisted_key";
+    let host_before = "192.168.1.1";
+    let port_before = "11";
+    let key_before = "";
+
+    // create first server
+    node_service::add_server(AddServerServiceParams {
+        name: name_before.to_string(),
+        user: user_before.to_string(),
+        host: host_before.to_string(),
+        port: port_before.to_string(),
+        key: key_before.to_string(),
+        default_passphrase: None
+    }).await.unwrap();
+
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
+
+    exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&name_before), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string(&format!("User ({user_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&user_before), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string(&format!("Host ({host_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&host_before), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string(&format!("Port ({port_before}): ")), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line(&port_before), &mut p, file!(), line!(), column!());
+    
+    if key_before == "" {
+        exp_string_assert(p.exp_string(&format!("Change key [y/n]?: ")), &mut p, file!(), line!(), column!());
+        send_line_assert(p.send_line("y"), &mut p, file!(), line!(), column!());
+    } else {
+        exp_string_assert(p.exp_string(&format!("Change key ({key_before}) [y/n]?: ")), &mut p, file!(), line!(), column!());
+        send_line_assert(p.send_line("y"), &mut p, file!(), line!(), column!());
+    }
+
+    exp_string_assert(p.exp_string("Key name (create if not exists and use default key/password if empty): "), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line("authorized_keys"), &mut p, file!(), line!(), column!());
+
+    exp_string_assert(p.exp_string(&format!("Key name can't be on of [{}]", &get_blacklisted_key_name().join(", "))), &mut p, file!(), line!(), column!());
+
+    p.process_mut().kill(Signal::SIGKILL).unwrap();
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -329,11 +510,12 @@ async fn test_delete_server() {
     // delete
     let mut p = spawn_test(&vec!["d", &format!("server: {name}")], Some(5_000)).unwrap();
 
-    p.exp_string("Are you sure [y/n]?").unwrap();
-    p.send_line("y").unwrap();
+    exp_string_assert(p.exp_string("Are you sure [y/n]?"), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line("y"), &mut p, file!(), line!(), column!());
 
-    p.exp_string("Success:").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("Success:"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check saved data
     let saved_data = node_service::get_node_by_names(&name).await.unwrap();
@@ -364,9 +546,10 @@ async fn test_delete_server_cancel() {
     // delete
     let mut p = spawn_test(&vec!["d", &format!("server: {name}")], Some(5_000)).unwrap();
 
-    p.exp_string("Are you sure [y/n]?").unwrap();
-    p.send_line("n").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("Are you sure [y/n]?"), &mut p, file!(), line!(), column!());
+    send_line_assert(p.send_line("n"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check saved data
     let saved_data = node_service::get_node_by_names(&name).await.unwrap();
@@ -397,9 +580,10 @@ async fn test_scan_server_container_selecttion() {
     // scan
     let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
 
-    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t" "docker ps --format {{{{.Names}}}}""#)).unwrap();
-    p.exp_string("finished").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t" "docker ps --format {{{{.Names}}}}""#)), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string("finished"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check count
     let pool = get_db_pool().await.unwrap();
@@ -434,10 +618,11 @@ async fn test_scan_server_container_all() {
     // scan
     let mut p = spawn_test(&vec!["S", "-f", "fake-container-all-1", "-f", "fake-container-all-2"], Some(5_000)).unwrap();
 
-    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t""#)).unwrap();
-    p.exp_string(&format!(r#""docker ps --format {{{{.Names}}}}""#)).unwrap();
-    p.exp_string("finished").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t""#)), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!(r#""docker ps --format {{{{.Names}}}}""#)), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string("finished"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // check count
     let pool = get_db_pool().await.unwrap();
@@ -474,8 +659,9 @@ async fn test_connect_to_server() {
     // connect
     let mut p = spawn_test(&vec!["c", &format!("server: {name}")], Some(5_000)).unwrap();
 
-    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-i" "{key_path}""#)).unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-i" "{key_path}""#)), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -501,8 +687,9 @@ async fn test_connect_to_server_default_key() {
     // connect
     let mut p = spawn_test(&vec!["c", &format!("server: {name}")], Some(5_000)).unwrap();
 
-    p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}""#)).unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}""#)), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -516,7 +703,8 @@ async fn test_connect_to_container() {
 
     p.exp_regex(&format!(r#""docker" "exec" "{name}" "sh" "-c" "(?:bash|ash|sh)""#)).unwrap();
     p.exp_regex(&format!(r#""docker" "exec" "-it" "{name}" "(?:bash|ash|sh)""#)).unwrap();
-    p.exp_eof().unwrap();
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -541,15 +729,17 @@ async fn test_connect_to_server_container() {
 
     // scan
     let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
-    p.exp_string("finished").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("finished"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // conenct
     let mut p = spawn_test(&vec!["c", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
 
     p.exp_regex(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec fake-container-1 sh -c (?:bash|ash|sh)""#)).unwrap();
     p.exp_regex(&format!(r#""ssh" "-t" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec -it fake-container-1 (?:bash|ash|sh)""#)).unwrap();
-    p.exp_eof().unwrap();
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -577,9 +767,10 @@ async fn test_show_key() {
 
     // show key
     let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], Some(5_000)).unwrap();
-    p.exp_string(&format!("Key location: {}", &key_location)).unwrap();
-    p.exp_string(&key_content.trim()).unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!("Key location: {}", &key_location)), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&key_content.trim()), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -604,8 +795,9 @@ async fn test_show_key_default_key() {
 
     // show key
     let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], Some(5_000)).unwrap();
-    p.exp_string("Info: Use default keys").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("Info: Use default keys"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -616,8 +808,9 @@ async fn test_show_detail_container() {
 
     // show detail
     let mut p = spawn_test(&vec!["si", &format!("container: {name}")], Some(5_000)).unwrap();
-    p.exp_string(&format!(r#""docker" "ps" "-f" "name=^{name}$" "--format" "CONTAINER:\n  Name: {{{{.Names}}}}\n  ID: {{{{.ID}}}}\n  Image: {{{{.Image}}}}\n  Status: {{{{.Status}}}}\n  Ports: {{{{.Ports}}}}""#)).unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!(r#""docker" "ps" "-f" "name=^{name}$" "--format" "CONTAINER:\n  Name: {{{{.Names}}}}\n  ID: {{{{.ID}}}}\n  Image: {{{{.Image}}}}\n  Status: {{{{.Status}}}}\n  Ports: {{{{.Ports}}}}""#)), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -642,10 +835,11 @@ async fn test_show_detail_server_default_key() {
 
     // show detail
     let mut p = spawn_test(&vec!["si", &format!("server: {name}")], Some(5_000)).unwrap();
-    p.exp_string(&format!("Name: {name}")).unwrap();
-    p.exp_string(&format!("Address: {user}@{host}:{port}")).unwrap();
-    p.exp_string(&format!("Key: [default key]")).unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!("Name: {name}")), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Address: {user}@{host}:{port}")), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Key: [default key]")), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -670,10 +864,11 @@ async fn test_show_detail_server_custom_key() {
 
     // show detail
     let mut p = spawn_test(&vec!["si", &format!("server: {name}")], Some(5_000)).unwrap();
-    p.exp_string(&format!("Name: {name}")).unwrap();
-    p.exp_string(&format!("Address: {user}@{host}:{port}")).unwrap();
-    p.exp_string(&format!("Key: {key}")).unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string(&format!("Name: {name}")), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Address: {user}@{host}:{port}")), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Key: {key}")), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }
 
 #[tokio::test]
@@ -698,8 +893,9 @@ async fn test_show_detail_server_container() {
 
     // scan
     let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
-    p.exp_string("finished").unwrap();
-    p.exp_eof().unwrap();
+    exp_string_assert(p.exp_string("finished"), &mut p, file!(), line!(), column!());
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // show detail
     let mut p = spawn_test(&vec!["si", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
@@ -708,5 +904,6 @@ async fn test_show_detail_server_container() {
     let expected2 = format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name=\'^fake-container-1$\' --format \'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}\'""#);
     p.exp_regex(&format!("(?:{}|{})", regex::escape(&expected1), regex::escape(&expected2))).unwrap();
 
-    p.exp_eof().unwrap();
+    
+    eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 }

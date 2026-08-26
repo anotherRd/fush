@@ -7,7 +7,7 @@ use fush::helper::{auto_complete_key, check_requirement, connect_to_container, c
 use fush::config::{is_test, key_dir};
 use fush::migration::migrate;
 use fush::database::get_db_pool;
-use fush::service::node_service::{self, find_node_by_name};
+use fush::service::node_service::{self, find_node_by_name, get_node_by_names};
 use fush::service_params::node_service_params::{EditServerServiceParams, AddServerServiceParams};
 use sqlx::{Row};
 use fush::config::{init_config};
@@ -16,7 +16,17 @@ use std::fs;
 async fn add_server() -> Result<(), Box<dyn std::error::Error>> {
     // read user input
     custom_print("info", "Add new server");
-    let name = read_from_input("Name", None, vec![], true)?;
+    let mut name_available = false;
+    let mut name = String::new();
+    while !name_available {
+        name = read_from_input("Name", None, vec![], true)?;
+        name_available = get_node_by_names(&name).await?.is_empty();
+        if !name_available {
+            custom_print("warning", &format!("{name} is already exists"));
+        }
+    }
+
+
     let user = read_from_input("User", None, vec![], true)?;
     let host = read_from_input("Host", None, vec![], true)?;
     let port = read_from_input("Port (22)", Some("22"), vec![], true)?;
@@ -49,7 +59,22 @@ async fn edit_server(selected: String) -> Result<(), Box<dyn std::error::Error>>
 
     // read user input
     custom_print("info", &format!("Edit server: {selected_name}"));
-    let name = read_from_input(&format!("Name ({})", &node_dto.name), Some(&node_dto.name), vec![], true)?;
+    
+    let mut name_available = false;
+    let mut name = String::new();
+    while !name_available {
+        name_available = true;
+        name = read_from_input(&format!("Name ({})", &node_dto.name), Some(&node_dto.name), vec![], true)?;
+        let existing_nodes = get_node_by_names(&name).await?;
+        if existing_nodes.len() > 1 || (existing_nodes.len() == 1 && existing_nodes[0].id != node_dto.id) {
+            name_available = false;
+        }
+
+        if !name_available {
+            custom_print("warning", &format!("{name} is already exists"));
+        }
+    }
+
     let user = read_from_input(&format!("User ({old_user})"), Some(&old_user), vec![], true)?;
     let host = read_from_input(&format!("Host ({old_host})"), Some(&old_host), vec![], true)?;
     let port = read_from_input(&format!("Port ({old_port})"), Some(&old_port), vec![], true)?;
