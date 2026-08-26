@@ -233,3 +233,15 @@ pub async fn delete_server_by_names(names: &Vec<String>) -> Result<(), Box<dyn s
 
     Ok(())
 }
+
+pub fn get_blacklisted_key_name<'a>() -> Vec<&'a str> {
+    return vec![
+        "config",
+        "known_hosts",
+        "known_hosts.old",
+        "authorized_keys",
+        "authorized_keys2",
+        "environment",
+        "rc",
+    ];
+}

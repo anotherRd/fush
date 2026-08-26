@@ -139,3 +139,16 @@ async fn test_create_key_pair_exists() {
 
     assert_ne!(file1_content_before, file1_content_after);
 }
+
+#[tokio::test]
+async fn test_blacklisted_key_name() {
+    setup().await;
+
+    assert_eq!(true, create_key_pair("config", false, Some(String::new())).is_err());
+    assert_eq!(true, create_key_pair("known_hosts", false, Some(String::new())).is_err());
+    assert_eq!(true, create_key_pair("known_hosts", false, Some(String::new())).is_err());
+    assert_eq!(true, create_key_pair("authorized_keys", false, Some(String::new())).is_err());
+    assert_eq!(true, create_key_pair("authorized_keys2", false, Some(String::new())).is_err());
+    assert_eq!(true, create_key_pair("environment", false, Some(String::new())).is_err());
+    assert_eq!(true, create_key_pair("rc", false, Some(String::new())).is_err());
+}

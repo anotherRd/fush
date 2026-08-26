@@ -2,6 +2,7 @@ use std::io::{self, Write};
 use crate::config::{get_requirements, key_dir, tmp_list_file};
 use crate::debug_println;
 use crate::dto::node_dto::NodeDto;
+use crate::service::node_service::get_blacklisted_key_name;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::fs::File;
@@ -430,6 +431,13 @@ pub fn create_key_pair(key: &str, overwrite: bool, default_passphrase: Option<St
     let key_path = format!("{}", key_dir.join(&key).display());
     let pub_key_path = format!("{}.pub", key_dir.join(&key).display());
 
+    // check for not allowed names
+    let blacklisted_names = get_blacklisted_key_name();
+
+    if blacklisted_names.contains(&key) {
+        return Err(format!("Error: key with name {key} is not allowed").into());
+    }
+
     // if key pair exists and overwrite false return false
     if key_pair_exists(&key)? && !overwrite {
         return Ok(false);
@@ -579,11 +587,15 @@ pub fn auto_complete_key(
     choices: Vec<&str>,
     required: bool
 ) -> Result<String, Box<dyn std::error::Error>> {
+    let blacklisted_key_name = get_blacklisted_key_name();
     let candidates: Vec<String> = fs::read_dir(&key_dir()?)?
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_ok_and(|t| t.is_file()))
         .filter(|entry| {
             !entry.file_name().to_string_lossy().ends_with(".pub")
+        })
+        .filter(|entry| {
+            !blacklisted_key_name.contains(&entry.file_name().to_string_lossy().as_ref())
         })
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .collect();
@@ -621,6 +633,9 @@ pub fn auto_complete_key(
                 custom_print("warning", &format!("{caption} value must be [{choice_values}]"));
                 continue_loop = true;
             }
+        } else if blacklisted_key_name.contains(&trimmed_input) {
+            continue_loop = true;
+            custom_print("warning", &format!("Key name can't be on of [{}]", &blacklisted_key_name.join(", ")));
         }
     }
 
