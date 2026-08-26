@@ -1,6 +1,8 @@
 @echo off
 setlocal
 
+cd /d "%~dp0"
+
 :: elevated installation mode
 if /I "%~1"=="__install" goto install
 
