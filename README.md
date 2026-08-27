@@ -1,6 +1,6 @@
 # Fush
 
-Fush is a CLI based shell connection manager that allows you to connect to SSH, container, and WSL shells in one place
+Fush is a CLI tool for quickly accessing SSH, container, and WSL shells in one place
 
 ## # Table of Contents
 
@@ -59,13 +59,13 @@ These are the requirements for using **Fush**:
 
 *Note: All of the requirements must be executable on the command line*
 
-To install Fush, download the release binary archive, extract, and run these commands to make the application available as a command
+Download the pre-built binaries from the release page and run these commands to make the it available as a command
 
 #### Linux :
 ```
-sudo chmod +x <full-path-to-the-extracted-fush-location>/fush
+sudo chmod +x <full-path-to-the-fush-directory-location>/fush
 
-sudo ln -sf <full-path-to-the-extracted-fush-location>/fush /usr/local/bin/fush
+sudo ln -sf <full-path-to-the-fush-directory-location>/fush /usr/local/bin/fush
 ```
 
 
@@ -76,7 +76,7 @@ SSH key will be stored in `~/.ssh`
 #### Windows :
 Requires PowerShell to be run as Administrator
 ```
-$dir = "<full-path-to-the-extracted-fush-location>\fush.exe"
+$dir = "<full-path-to-the-fush-directory-location>\fush.exe"
 
 $path = [Environment]::GetEnvironmentVariable("Path", "Machine")
 
