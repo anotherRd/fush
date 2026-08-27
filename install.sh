@@ -10,7 +10,7 @@ echo "INSTALLING"
 cargo build --release
 
 # copy the binary file
-sudo mkdir -p "/usr/local/bin/"
-sudo cp target/release/fush "/usr/local/bin/fush"
-sudo chmod 755 "/usr/local/bin/fush"
-echo "Successfully installed to /usr/local/bin/fush"
+sudo cp -r target/release /opt/fush
+sudo chmod +x /opt/fush/fush
+sudo ln -sf "/opt/fush/fush" /usr/local/bin/fush
+echo "Successfully installed to /opt/fush/fush"

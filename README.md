@@ -26,7 +26,7 @@ Using `fzf` as a selector with its fuzzy finder feature makes searching through 
 
 <br>
 
-On linux it will show
+On **linux** it will show
 * Saved server
 * Saved docker container inside server (after using scan function)
 * running local docker container 
@@ -37,7 +37,7 @@ On linux it will show
 
 <br>
 
-On windows it will show
+On **windows** it will show
 * saved server
 * saved docker container inside server (after using scan function)
 * running local docker container
@@ -59,13 +59,36 @@ These are the requirements for using **Fush**:
 
 *Note: All of the requirements must be executable on the command line*
 
+To install Fush, download the release binary archive, extract, and run these commands to make the application available as a command
+
+#### Linux :
+```
+sudo chmod +x <full-path-to-the-extracted-fush-dir>/fush
+sudo ln -sf <full-path-to-the-extracted-fush-dir>/fush /usr/local/bin/fush
+```
+
+
+Data will be stored in user config directory `~/.config/fush`
+
+SSH key will be stored in `~/.ssh`
+
+#### Windows :
+```
+$dir = "<full-path-to-the-extracted-fush-dir>\fush"
+$path = [Environment]::GetEnvironmentVariable("Path", "Machine")
+if (($path -split ";") -notcontains $dir) { [Environment]::SetEnvironmentVariable("Path", $path.TrimEnd(";") + ";" + $dir, "Machine") }
+```
+
+Data will be stored in user config directory `C:\Users\<user>\AppData\Roaming\fush`
+
+SSH key will be stored in `C:\Users\<your-username>\.ssh`
+
 <br>
 
-To install Fush, download the release binary archive, extract it, and move the binary file to an appropriate place, e.g., `/usr/local/bin` *(linux)* or `C:\Program Files\fush` *(windows)* and set add binary location to PATH if needed
-
-Data will be stored in user config directory `~/.config/fush` *(linux)* or `C:\Users\<user>\AppData\Roaming\fush` *(windows)*
-
-SSH key will be stored in `~/.ssh` *(linux)* or `C:\Users\<your-username>\.ssh` *(windows)*
+Check the installation by opening a new terminal and run
+```
+fush --version
+```
 
 ## # Build from source
 
@@ -95,9 +118,9 @@ These are the requirements for building **Fush**:
 ```
 cargo build --release
 ```
-After finish building the generated binary file location should be in `./target/release/fush` *(linux)* or `.\target\release\fush` *(windows)*
+After build is finished the released dir should be in `./target/release` *(linux)* or `.\target\release` *(windows)*. Follow the [installation](#-installation) guide  to make it  available as command
 
-Or you could use installer script `install.sh` *(linux)* or `install.bat` *(windows)*, it will execute build command and try to move the binary file into `/usr/local/bin` *(linux)* or `C:\Program Files\fush` *(windows)* and add the binary location to PATH variable on windows
+Or you could build fush with the installer script `install.sh` *(linux)* or `install.bat` *(windows)*, it will execute build command and try to copy the released dir into `/opt` *(linux)* or `C:\Program Files` *(windows)* and then also try to make it available as command
 
 ## # Usage
 ### Add server

@@ -32,7 +32,7 @@ if not exist "%INSTALL_DIR%" (
     if errorlevel 1 exit /b %errorlevel%
 )
 
-copy /Y "%~dp0target\release\fush.exe" "%INSTALL_DIR%\fush.exe"
+copy /Y "%~dp0target\release" "%INSTALL_DIR%"
 if errorlevel 1 exit /b %errorlevel%
 
 :: add installation directory to machine PATH
