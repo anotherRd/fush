@@ -234,6 +234,22 @@ pub async fn delete_server_by_names(names: &Vec<String>) -> Result<(), Box<dyn s
     Ok(())
 }
 
+pub async fn delete_all() -> Result<(), Box<dyn std::error::Error>> {
+    let pool = get_db_pool().await?;
+    let mut tx = pool.begin().await?;
+
+    // delete from db
+    let query = format!("DELETE FROM nodes");
+
+    // bind actual data
+    let q = sqlx::query(&query);
+    q.execute(&mut *tx).await?;
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
 pub fn get_blacklisted_key_name<'a>() -> Vec<&'a str> {
     return vec![
         "config",

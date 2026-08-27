@@ -1,4 +1,4 @@
-use fush::{helper::key_pair_exists, service::node_service::{self, get_blacklisted_key_name}, service_params::node_service_params::AddServerServiceParams};
+use fush::{helper::key_pair_exists, service::node_service::{self, delete_all, get_blacklisted_key_name}, service_params::node_service_params::AddServerServiceParams};
 use rexpect::{error::Error, process::Signal, session::{PtySession, spawn_command}};
 use sqlx::Row;
 use tokio::sync::OnceCell;
@@ -34,7 +34,10 @@ async fn setup() {
         .await;
 }
 
-fn spawn_test(args: &Vec<&str>, timeout_ms: Option<u64>) -> Result<rexpect::session::PtySession, Error> {
+fn spawn_test(args: &Vec<&str>, mut timeout_ms: Option<u64>) -> Result<rexpect::session::PtySession, Error> {
+    if timeout_ms.is_none() {
+        timeout_ms = Some(10_000);
+    }
     let mut cmd = Command::new(BINARY);
     cmd.env("FUSH_TEST", "1");
     cmd.args(args);
@@ -90,6 +93,7 @@ fn eof_assert(
 #[tokio::test]
 async fn test_add_server() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "add_server";
     let user = "user_add_server";
@@ -97,7 +101,7 @@ async fn test_add_server() {
     let port = "33";
     let key = "add_server_key";
 
-    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["a"], None).unwrap();
 
     exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
@@ -137,6 +141,7 @@ async fn test_add_server() {
 #[tokio::test]
 async fn test_add_server_default_value() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "add_server_default_value";
     let user = "user_add_server_default_value";
@@ -144,7 +149,7 @@ async fn test_add_server_default_value() {
     let port = "";
     let key = "";
 
-    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["a"], None).unwrap();
 
     exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
@@ -179,6 +184,7 @@ async fn test_add_server_default_value() {
 #[tokio::test]
 async fn test_add_server_duplicate_name() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "add_server_duplicate_name";
     let user = "user_add_server_duplicate_name";
@@ -198,7 +204,7 @@ async fn test_add_server_duplicate_name() {
 
 
     // create node with same name
-    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["a"], None).unwrap();
 
     exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
@@ -217,6 +223,7 @@ async fn test_add_server_duplicate_name() {
 #[tokio::test]
 async fn test_add_server_blacklisted_key() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "add_server_blacklisted_key";
     let user = "user_add_server_blacklisted_key";
@@ -224,7 +231,7 @@ async fn test_add_server_blacklisted_key() {
     let port = "";
     let key = "authorized_keys";
 
-    let mut p = spawn_test(&vec!["a"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["a"], None).unwrap();
 
     exp_string_assert(p.exp_string("Name: "), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name), &mut p, file!(), line!(), column!());
@@ -251,6 +258,7 @@ async fn test_add_server_blacklisted_key() {
 #[tokio::test]
 async fn test_edit_server() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name_before = "edit_server_before";
     let user_before = "user_edit_server_before";
@@ -276,7 +284,7 @@ async fn test_edit_server() {
     let port_after = "33";
     let key_after = "edit_server_key_after";
 
-    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name_after), &mut p, file!(), line!(), column!());
@@ -325,6 +333,7 @@ async fn test_edit_server() {
 #[tokio::test]
 async fn test_edit_server_unchanged() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name_before = "edit_server_unchanged";
     let user_before = "user_edit_server_unchanged";
@@ -349,7 +358,7 @@ async fn test_edit_server_unchanged() {
     let host_after = "";
     let port_after = "";
 
-    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name_after), &mut p, file!(), line!(), column!());
@@ -386,6 +395,7 @@ async fn test_edit_server_unchanged() {
 #[tokio::test]
 async fn test_edit_server_duplicate() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name_before = "edit_server_duplicate";
     let user_before = "user_edit_server_duplicate";
@@ -418,7 +428,7 @@ async fn test_edit_server_duplicate() {
         default_passphrase: None
     }).await.unwrap();
 
-    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name_second), &mut p, file!(), line!(), column!());
@@ -437,6 +447,7 @@ async fn test_edit_server_duplicate() {
 #[tokio::test]
 async fn test_edit_server_blacklisted_key() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name_before = "edit_server_blacklisted_key";
     let user_before = "user_edit_server_blacklisted_key";
@@ -454,7 +465,7 @@ async fn test_edit_server_blacklisted_key() {
         default_passphrase: None
     }).await.unwrap();
 
-    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["e", &format!("server: {name_before}")], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!("Name ({name_before}): ")), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&name_before), &mut p, file!(), line!(), column!());
@@ -489,6 +500,7 @@ async fn test_edit_server_blacklisted_key() {
 #[tokio::test]
 async fn test_delete_server() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "delete_server";
     let user = "user_delete_server";
@@ -508,7 +520,7 @@ async fn test_delete_server() {
 
 
     // delete
-    let mut p = spawn_test(&vec!["d", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["d", &format!("server: {name}")], None).unwrap();
 
     exp_string_assert(p.exp_string("Are you sure [y/n]?"), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line("y"), &mut p, file!(), line!(), column!());
@@ -525,6 +537,7 @@ async fn test_delete_server() {
 #[tokio::test]
 async fn test_delete_server_cancel() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "delete_server_cancel";
     let user = "user_delete_server_cancel";
@@ -544,7 +557,7 @@ async fn test_delete_server_cancel() {
 
 
     // delete
-    let mut p = spawn_test(&vec!["d", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["d", &format!("server: {name}")], None).unwrap();
 
     exp_string_assert(p.exp_string("Are you sure [y/n]?"), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line("n"), &mut p, file!(), line!(), column!());
@@ -559,6 +572,7 @@ async fn test_delete_server_cancel() {
 #[tokio::test]
 async fn test_scan_server_container_selecttion() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "scan_server_container_selecttion";
     let user = "user_scan_server_container_selecttion";
@@ -578,7 +592,7 @@ async fn test_scan_server_container_selecttion() {
 
 
     // scan
-    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t" "docker ps --format {{{{.Names}}}}""#)), &mut p, file!(), line!(), column!());
     exp_string_assert(p.exp_string("finished"), &mut p, file!(), line!(), column!());
@@ -597,6 +611,7 @@ async fn test_scan_server_container_selecttion() {
 #[tokio::test]
 async fn test_scan_server_container_all() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "scan_server_container_all";
     let user = "user_scan_server_container_all";
@@ -616,7 +631,7 @@ async fn test_scan_server_container_all() {
 
 
     // scan
-    let mut p = spawn_test(&vec!["S", "-f", "fake-container-all-1", "-f", "fake-container-all-2"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["S", "-f", "fake-container-all-1", "-f", "fake-container-all-2"], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-t""#)), &mut p, file!(), line!(), column!());
     exp_string_assert(p.exp_string(&format!(r#""docker ps --format {{{{.Names}}}}""#)), &mut p, file!(), line!(), column!());
@@ -636,6 +651,7 @@ async fn test_scan_server_container_all() {
 #[tokio::test]
 async fn test_connect_to_server() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "connect_to_server";
     let user = "user_connect_to_server";
@@ -657,7 +673,7 @@ async fn test_connect_to_server() {
     let key_path = format!("{}", key_dir.display());
 
     // connect
-    let mut p = spawn_test(&vec!["c", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("server: {name}")], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "-i" "{key_path}""#)), &mut p, file!(), line!(), column!());
     
@@ -667,6 +683,7 @@ async fn test_connect_to_server() {
 #[tokio::test]
 async fn test_connect_to_server_default_key() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "connect_to_server_default_key";
     let user = "user_connect_to_server_default_key";
@@ -685,7 +702,7 @@ async fn test_connect_to_server_default_key() {
     }).await.unwrap();
 
     // connect
-    let mut p = spawn_test(&vec!["c", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("server: {name}")], None).unwrap();
 
     exp_string_assert(p.exp_string(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}""#)), &mut p, file!(), line!(), column!());
     
@@ -695,11 +712,12 @@ async fn test_connect_to_server_default_key() {
 #[tokio::test]
 async fn test_connect_to_container() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "connect_to_container";
 
     // conenct
-    let mut p = spawn_test(&vec!["c", &format!("container: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("container: {name}")], None).unwrap();
 
     p.exp_regex(&format!(r#""docker" "exec" "{name}" "sh" "-c" "(?:bash|ash|sh)""#)).unwrap();
     p.exp_regex(&format!(r#""docker" "exec" "-it" "{name}" "(?:bash|ash|sh)""#)).unwrap();
@@ -710,6 +728,7 @@ async fn test_connect_to_container() {
 #[tokio::test]
 async fn test_connect_to_server_container() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "connect_to_server_container";
     let user = "user_connect_to_server_container";
@@ -728,13 +747,13 @@ async fn test_connect_to_server_container() {
     }).await.unwrap();
 
     // scan
-    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], None).unwrap();
     exp_string_assert(p.exp_string("finished"), &mut p, file!(), line!(), column!());
     
     eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // conenct
-    let mut p = spawn_test(&vec!["c", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["c", &format!("server container: {name}: fake-container-1")], None).unwrap();
 
     p.exp_regex(&format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec fake-container-1 sh -c (?:bash|ash|sh)""#)).unwrap();
     p.exp_regex(&format!(r#""ssh" "-t" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker exec -it fake-container-1 (?:bash|ash|sh)""#)).unwrap();
@@ -745,6 +764,7 @@ async fn test_connect_to_server_container() {
 #[tokio::test]
 async fn test_show_key() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "show_key";
     let user = "user_show_key";
@@ -766,7 +786,7 @@ async fn test_show_key() {
     let key_content = fs::read_to_string(&key_location).unwrap();
 
     // show key
-    let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], None).unwrap();
     exp_string_assert(p.exp_string(&format!("Key location: {}", &key_location)), &mut p, file!(), line!(), column!());
     exp_string_assert(p.exp_string(&key_content.trim()), &mut p, file!(), line!(), column!());
     
@@ -776,6 +796,7 @@ async fn test_show_key() {
 #[tokio::test]
 async fn test_show_key_default_key() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "show_key_default_key";
     let user = "user_show_key_default_key";
@@ -794,7 +815,7 @@ async fn test_show_key_default_key() {
     }).await.unwrap();
 
     // show key
-    let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["sk", &format!("server: {name}")], None).unwrap();
     exp_string_assert(p.exp_string("Info: Use default keys"), &mut p, file!(), line!(), column!());
     
     eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
@@ -803,11 +824,12 @@ async fn test_show_key_default_key() {
 #[tokio::test]
 async fn test_show_detail_container() {
     setup().await;
+    delete_all().await.unwrap();
     
     let name = "show_detail_container";
 
     // show detail
-    let mut p = spawn_test(&vec!["si", &format!("container: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("container: {name}")], None).unwrap();
     exp_string_assert(p.exp_string(&format!(r#""docker" "ps" "-f" "name=^{name}$" "--format" "CONTAINER:\n  Name: {{{{.Names}}}}\n  ID: {{{{.ID}}}}\n  Image: {{{{.Image}}}}\n  Status: {{{{.Status}}}}\n  Ports: {{{{.Ports}}}}""#)), &mut p, file!(), line!(), column!());
     
     eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
@@ -816,6 +838,7 @@ async fn test_show_detail_container() {
 #[tokio::test]
 async fn test_show_detail_server_default_key() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "show_detail_server_default_key";
     let user = "user_show_detail_server_default_key";
@@ -834,7 +857,7 @@ async fn test_show_detail_server_default_key() {
     }).await.unwrap();
 
     // show detail
-    let mut p = spawn_test(&vec!["si", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("server: {name}")], None).unwrap();
     exp_string_assert(p.exp_string(&format!("Name: {name}")), &mut p, file!(), line!(), column!());
     exp_string_assert(p.exp_string(&format!("Address: {user}@{host}:{port}")), &mut p, file!(), line!(), column!());
     exp_string_assert(p.exp_string(&format!("Key: [default key]")), &mut p, file!(), line!(), column!());
@@ -845,6 +868,7 @@ async fn test_show_detail_server_default_key() {
 #[tokio::test]
 async fn test_show_detail_server_custom_key() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "show_detail_server_custom_key";
     let user = "user_show_detail_server_custom_key";
@@ -863,7 +887,7 @@ async fn test_show_detail_server_custom_key() {
     }).await.unwrap();
 
     // show detail
-    let mut p = spawn_test(&vec!["si", &format!("server: {name}")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("server: {name}")], None).unwrap();
     exp_string_assert(p.exp_string(&format!("Name: {name}")), &mut p, file!(), line!(), column!());
     exp_string_assert(p.exp_string(&format!("Address: {user}@{host}:{port}")), &mut p, file!(), line!(), column!());
     exp_string_assert(p.exp_string(&format!("Key: {key}")), &mut p, file!(), line!(), column!());
@@ -874,6 +898,7 @@ async fn test_show_detail_server_custom_key() {
 #[tokio::test]
 async fn test_show_detail_server_container() {
     setup().await;
+    delete_all().await.unwrap();
 
     let name = "show_detail_server_container";
     let user = "user_show_detail_server_container";
@@ -892,13 +917,13 @@ async fn test_show_detail_server_container() {
     }).await.unwrap();
 
     // scan
-    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["s", &format!("server: {name}"), "-f", "fake-container-1", "-f", "fake-container-2"], None).unwrap();
     exp_string_assert(p.exp_string("finished"), &mut p, file!(), line!(), column!());
     
     eof_assert(p.exp_eof(), &mut p, file!(), line!(), column!());
 
     // show detail
-    let mut p = spawn_test(&vec!["si", &format!("server container: {name}: fake-container-1")], Some(5_000)).unwrap();
+    let mut p = spawn_test(&vec!["si", &format!("server container: {name}: fake-container-1")], None).unwrap();
 
     let expected1 = format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name='^fake-container-1$' --format 'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}'""#);
     let expected2 = format!(r#""ssh" "-o" "ConnectTimeout=5" "{user}@{host}" "-p" "{port}" "docker ps -f name=\'^fake-container-1$\' --format \'CONTAINER:\n    Name: {{{{.Names}}}}\n    ID: {{{{.ID}}}}\n    Image: {{{{.Image}}}}\n    Status: {{{{.Status}}}}\n    Ports: {{{{.Ports}}}}\'""#);
