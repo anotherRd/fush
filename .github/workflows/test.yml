@@ -1,0 +1,34 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    container:
+      image: rust:bookworm
+
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential \
+            ca-certificates \
+            git \
+            sqlite3 \
+            fzf \
+            ssh \
+            pkg-config
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run test
+        run: cargo run -- test
