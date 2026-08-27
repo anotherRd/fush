@@ -120,7 +120,7 @@ cargo build --release
 ```
 After build is finished the released dir should be in `./target/release` *(linux)* or `.\target\release` *(windows)*. Follow the [installation](#-installation) guide  to make it  available as command
 
-Or you could build fush with the installer script `install.sh` *(linux)* or `install.bat` *(windows)*, it will execute build command and try to copy the released dir into `/opt` *(linux)* or `C:\Program Files` *(windows)* and then also try to make it available as command
+Or you could build fush with the installer script `install.sh` *(linux)* or `install.bat` *(windows)*, it will execute build command and try to copy the released dir into `/opt` *(linux)* or `C:\Program Files` *(windows)* and then also try to make it available as command. *(You still need to install the build requirements manually)*
 
 ## # Usage
 ### Add server
