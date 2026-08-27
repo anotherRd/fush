@@ -22,7 +22,7 @@ Fush is a CLI based shell connection manager that allows you to connect to SSH, 
 #### Quick demo
 Using `fzf` as a selector with its fuzzy finder feature makes searching through many available connections more convenient
 
-<video src="./assets/demo.mp4" controls></video>
+![Demo preview](assets/demo.gif)
 
 <br>
 
@@ -63,8 +63,9 @@ To install Fush, download the release binary archive, extract, and run these com
 
 #### Linux :
 ```
-sudo chmod +x <full-path-to-the-extracted-fush-dir>/fush
-sudo ln -sf <full-path-to-the-extracted-fush-dir>/fush /usr/local/bin/fush
+sudo chmod +x <full-path-to-the-extracted-fush-location>/fush
+
+sudo ln -sf <full-path-to-the-extracted-fush-location>/fush /usr/local/bin/fush
 ```
 
 
@@ -73,9 +74,12 @@ Data will be stored in user config directory `~/.config/fush`
 SSH key will be stored in `~/.ssh`
 
 #### Windows :
+Requires PowerShell to be run as Administrator
 ```
-$dir = "<full-path-to-the-extracted-fush-dir>\fush"
+$dir = "<full-path-to-the-extracted-fush-location>\fush.exe"
+
 $path = [Environment]::GetEnvironmentVariable("Path", "Machine")
+
 if (($path -split ";") -notcontains $dir) { [Environment]::SetEnvironmentVariable("Path", $path.TrimEnd(";") + ";" + $dir, "Machine") }
 ```
 
@@ -120,7 +124,7 @@ cargo build --release
 ```
 After build is finished the released dir should be in `./target/release` *(linux)* or `.\target\release` *(windows)*. Follow the [installation](#-installation) guide  to make it  available as command
 
-Or you could build fush with the installer script `install.sh` *(linux)* or `install.bat` *(windows)*, it will execute build command and try to copy the released dir into `/opt` *(linux)* or `C:\Program Files` *(windows)* and then also try to make it available as command. *(You still need to install the build requirements manually)*
+Or you could build fush with the installer script `install.sh` *(linux)* or `install.bat` *(windows)*, it will execute build command and try to copy the binary file into `/usr/local/bin` *(linux)* or `C:\Program Files\fush` *(windows)* and then also try to make it available as command. *(You still need to install the build requirements manually)*
 
 ## # Usage
 ### Add server
