@@ -30,7 +30,6 @@ jobs:
             ca-certificates \
             git \
             sqlite3 \
-            fzf \
             ssh \
             pkg-config
 

@@ -20,7 +20,7 @@ Fush is a CLI tool for quickly accessing SSH, container, and WSL shells in one p
 ## # Overview
 
 #### Quick demo
-Using `fzf` as a selector with its fuzzy finder feature makes searching through many available connections more convenient
+Using `skim` as a selector with its fuzzy finder feature makes searching through many available connections more convenient
 
 ![Demo preview](assets/demo.gif)
 
@@ -50,7 +50,6 @@ On **windows** it will show
 
 ## # Installation
 These are the requirements for using **Fush**:
-* fzf
 * ssh
 * ssh-keygen
 * sqlite3
@@ -97,7 +96,6 @@ fush --version
 ## # Build from source
 
 These are the requirements for building **Fush**:
-* fzf
 * ssh
 * ssh-keygen
 * sqlite3

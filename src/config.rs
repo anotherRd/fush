@@ -26,11 +26,6 @@ pub fn config_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Ok(config_dir)
 }
 
-pub fn tmp_dir() -> PathBuf {
-    let tmp_dir = std::env::temp_dir().join("fush");
-    return tmp_dir;
-}
-
 pub fn db_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let path = config_dir()?.join("data.db");
     return Ok(path);
@@ -56,18 +51,6 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&config_dir);
     fs::create_dir_all(path)?;
     
-    // create tmp dir if not exists
-    let tmp_dir = tmp_dir();
-    let tmp_dir_path = Path::new(&tmp_dir);
-    if !tmp_dir.exists() {
-        fs::create_dir_all(tmp_dir_path)?;
-        #[cfg(target_os = "linux")] {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(tmp_dir_path, fs::Permissions::from_mode(0o777))?;
-        }
-    }
-
-    
     // create db file if not exists
     OpenOptions::new()
         .write(true)
@@ -82,18 +65,11 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn tmp_list_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let username = std::env::var("USERNAME").or_else(|_| std::env::var("USER"))?;
-    let tmp_dir = tmp_dir().join(&username);
-    return Ok(tmp_dir);
-}
-
 pub fn get_requirements() -> (Vec<String>, Vec<String>) {
     let mandatory = vec![
         "sqlite3".to_string(),
         "ssh".to_string(),
         "ssh-keygen".to_string(),
-        "fzf".to_string(),
     ];
 
     let optional = vec![

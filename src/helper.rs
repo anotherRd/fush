@@ -1,11 +1,10 @@
 use std::io::{self, Write};
-use crate::config::{get_requirements, key_dir, tmp_list_file};
+use crate::config::{get_requirements, key_dir};
 use crate::debug_println;
 use crate::dto::node_dto::NodeDto;
 use crate::service::node_service::get_blacklisted_key_name;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::fs::File;
+use std::process::{Command};
 use crate::database::get_db_pool;
 use sqlx::Row;
 use std::{fs, println, vec};
@@ -17,6 +16,10 @@ use rustyline::{
     validate::Validator,
     Editor, Helper,
 };
+
+extern crate skim;
+use skim::prelude::*;
+use std::io::Cursor;
 
 pub struct AutocompleteHelper {
     pub candidates: Vec<String>,
@@ -277,37 +280,50 @@ pub fn connect_to_server_container(
 }
 
 
-pub fn multi_selection(title: &str) -> Result <Vec<String>, Box<dyn std::error::Error>> { 
-    // start fzf
-    let file = File::open(&tmp_list_file()?)?;
-    let output = Command::new("fzf")
-        .arg("--multi")
-        .arg(&format!("--header={title}"))
-        .stdin(Stdio::from(file))
-        .output()?;
+pub fn multi_selection(title: &str, candidate: String) -> Result <Vec<String>, Box<dyn std::error::Error>> { 
+    let mut results = Vec::new();
+    let item_reader = SkimItemReader::default();
+    let items = item_reader.of_bufread(Cursor::new(candidate));
 
-    // get selection to vec
-    let selections: Vec<String> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(String::from)
-        .collect();
+    let options = SkimOptionsBuilder::default()
+        .multi(true)
+        .prompt("Search > ".to_string())
+        .header(title)
+        .build()
+        .unwrap();
 
-    Ok(selections)
+    let skim_output = Skim::run_with(options, Some(items));
+    if let Ok(output) = skim_output {
+        if !output.is_abort {
+            for selected_item in output.selected_items {
+                results.push(selected_item.item.text().to_string());
+            }
+        }
+    }
+
+    Ok(results)
 }
 
-pub fn selection(title: &str) -> Result <String, Box<dyn std::error::Error>> { 
-    // start fzf
-    let file = File::open(&tmp_list_file()?)?;
-    let output = Command::new("fzf")
-        .arg(&format!("--header={title}"))
-        .stdin(Stdio::from(file))
-        .output()?;
+pub fn selection(title: &str, candidate: String) -> Result <String, Box<dyn std::error::Error>> { 
+    let mut result = String::new();
+    let item_reader = SkimItemReader::default();
+    let items = item_reader.of_bufread(Cursor::new(candidate));
 
-    let selected = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .to_string();
+    let options = SkimOptionsBuilder::default()
+        .multi(false)
+        .prompt("Search > ".to_string())
+        .header(title)
+        .build()
+        .unwrap();
 
-    Ok(selected)
+    let skim_output = Skim::run_with(options, Some(items));
+    if let Ok(output) = skim_output {
+        if !output.is_abort {
+            result = output.selected_items[0].item.text().to_string();
+        }
+    }
+
+    Ok(result)
 }
 
 pub fn db_array_placeholders(data_length: usize) -> String {
@@ -318,7 +334,7 @@ pub fn db_array_placeholders(data_length: usize) -> String {
 }
 
 pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file()?)?;
+    let mut candidate = String::new();
 
     // get local active container
     if let Ok(output) = Command::new("docker").args(["ps", "--format", "{{.Names}}"]).output() {
@@ -330,7 +346,7 @@ pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Er
     
         // write to tmp file
         for container in containers {
-            writeln!(file, "container: {container}")?;
+            candidate.push_str(&format!("container: {container}\n"));
         }
     }
     
@@ -340,7 +356,7 @@ pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Er
         if let Ok(wsls) = get_wsl_list() {
             // write to tmp file
             for wsl in &wsls {
-                writeln!(file, "wsl: {}", wsl[0])?;
+                candidate.push_str(&format!("wsl: {}\n", wsl[0]));
             }
             
             // get wsl container
@@ -353,7 +369,7 @@ pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Er
                         .collect();
 
                     for container in &wsls_containers {
-                        writeln!(file, "wsl container: {}: {container}", wsl[0])?;
+                        candidate.push_str(&format!("wsl container: {}: {container}\n", wsl[0]));
                     }
                 }
             }
@@ -371,16 +387,16 @@ pub async fn select_nodes(title: &str) -> Result <String, Box<dyn std::error::Er
         let name: String = row.get("name");
         let node_type: String = row.get("node_type");
         let node_type_caption = node_type.replace("_", " ");
-        writeln!(file, "{node_type_caption}: {name}")?;
+        candidate.push_str(&format!("{node_type_caption}: {name}\n"));
     }
 
-    let selected = selection(&title)?;
+    let selected = selection(title, candidate)?;
 
     Ok(selected)
 }
 
 pub async fn select_server(title: &str) -> Result <String, Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file()?)?;
+    let mut candidate = String::new();
     let pool = get_db_pool().await?;
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
         .fetch_all(&pool)
@@ -391,16 +407,16 @@ pub async fn select_server(title: &str) -> Result <String, Box<dyn std::error::E
         let name: String = row.get("name");
         let node_type: String = row.get("node_type");
         let node_type_caption = node_type.replace("_", " ");
-        writeln!(file, "{node_type_caption}: {name}")?;
+        candidate.push_str(&format!("{node_type_caption}: {name}\n"));
     }
 
-    let selected = selection(&title)?;
+    let selected = selection(&title, candidate)?;
 
     Ok(selected)
 }
 
 pub async fn select_multi_server(title: &str) -> Result <Vec<String>, Box<dyn std::error::Error>> {
-    let mut file = File::create(&tmp_list_file()?)?;
+    let mut candidate = String::new();
     let pool = get_db_pool().await?;
     let rows = sqlx::query("SELECT * FROM nodes WHERE node_type = 'server'")
         .fetch_all(&pool)
@@ -411,10 +427,10 @@ pub async fn select_multi_server(title: &str) -> Result <Vec<String>, Box<dyn st
         let name: String = row.get("name");
         let node_type: String = row.get("node_type");
         let node_type_caption = node_type.replace("_", " ");
-        writeln!(file, "{node_type_caption}: {name}")?;
+        candidate.push_str(&format!("{node_type_caption}: {name}\n"));
     }
 
-    let selections = multi_selection(&title)?;
+    let selections = multi_selection(&title, candidate)?;
 
     Ok(selections)
 }

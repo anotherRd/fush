@@ -12,6 +12,7 @@ rustyline = "18.0.1"
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "migrate"] }
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
 which = "8.0.5"
+skim = { version = "5.6.6", default-features = false}
 
 
 [target.'cfg(unix)'.dev-dependencies]
