@@ -59,7 +59,6 @@ On **windows** it will show
 These are the requirements for using **Fush**:
 * ssh
 * ssh-keygen
-* sqlite3
 * fzf (for fush version 0.9.2 or older)
 * docker (optional)
 * **windows only:** wsl (optional)
@@ -106,10 +105,9 @@ fush --version
 These are the requirements for building **Fush**:
 * ssh
 * ssh-keygen
-* sqlite3
 * docker (optional)
-* rustc >= 1.90.0
-* cargo >= 1.90.0
+* rustc >= 1.91.0
+* cargo >= 1.91.0
 * fzf (for fush version 0.9.2 or older)
 * C build toolchain e.g: 
 

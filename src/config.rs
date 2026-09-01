@@ -67,14 +67,17 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn get_requirements() -> (Vec<String>, Vec<String>) {
     let mandatory = vec![
-        "sqlite3".to_string(),
         "ssh".to_string(),
         "ssh-keygen".to_string(),
     ];
 
-    let optional = vec![
+    let mut optional = vec![
         "docker".to_string(),
     ];
+
+    if cfg!(target_os = "windows") {
+        optional.push("wsl".to_string());
+    }
 
     (mandatory, optional)
 }

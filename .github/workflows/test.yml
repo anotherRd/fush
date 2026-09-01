@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: rust:bookworm
+      image: rust:1.91.1-bookworm
 
     steps:
       - name: Install dependencies
