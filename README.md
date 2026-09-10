@@ -103,12 +103,8 @@ fush --version
 ## # Build from source
 
 These are the requirements for building **Fush**:
-* ssh
-* ssh-keygen
-* docker (optional)
 * rustc >= 1.91.0
 * cargo >= 1.91.0
-* fzf (for fush version 0.9.2 or older)
 * C build toolchain e.g: 
 
     | Distro/OS | Package |
