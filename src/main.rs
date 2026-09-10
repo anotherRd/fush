@@ -1,9 +1,11 @@
 use clap::{CommandFactory, Parser};
 use fush::custom_command::{Cli, Commands};
 use fush::debug_println;
+use fush::helper::general_helper::{check_requirement, custom_print, split_selected, split_server_address};
+use fush::helper::input_helper::{auto_complete_key, read_from_input};
+use fush::helper::node_helper::{connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, connect_to_wsl, connect_to_wsl_container, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, print_wsl_container_detail, print_wsl_detail, select_multi_server, select_node, select_server};
 use std::{println, vec};
 use std::process::{Command};
-use fush::helper::{auto_complete_key, check_requirement, connect_to_container, connect_to_server, connect_to_server_args, connect_to_server_container, connect_to_wsl, connect_to_wsl_container, custom_print, db_array_placeholders, key_pair_exists, print_container_detail, print_server_container_detail, print_server_detail, print_wsl_container_detail, print_wsl_detail, read_from_input, select_multi_server, select_nodes, select_server, split_selected, split_server_address};
 use fush::config::{is_test, key_dir};
 use fush::migration::migrate;
 use fush::database::get_db_pool;
@@ -12,6 +14,7 @@ use fush::service_params::node_service_params::{EditServerServiceParams, AddServ
 use sqlx::{Row};
 use fush::config::{init_config};
 use std::fs;
+use fush::helper::database_helper::db_array_placeholders;
 
 async fn add_server() -> Result<(), Box<dyn std::error::Error>> {
     // read user input
@@ -388,7 +391,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(selected_value) = arg {
                 selected = selected_value;
             } else {
-                selected = select_nodes("Select a node to connect").await?;
+                selected = select_node("Select a node to connect").await?;
             }
             connect(selected).await?;
         },
@@ -447,7 +450,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(selected_value) = arg {
                 selected = selected_value;
             } else {
-                selected = select_nodes("Select a node to show info").await?;
+                selected = select_node("Select a node to show info").await?;
             }
             show_info(selected).await?;
         },

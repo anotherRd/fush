@@ -65,7 +65,7 @@ pub fn init_config() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn get_requirements() -> (Vec<String>, Vec<String>) {
+pub fn requirements() -> (Vec<String>, Vec<String>) {
     let mandatory = vec![
         "ssh".to_string(),
         "ssh-keygen".to_string(),
@@ -80,4 +80,16 @@ pub fn get_requirements() -> (Vec<String>, Vec<String>) {
     }
 
     (mandatory, optional)
+}
+
+pub fn blacklisted_key_name<'a>() -> Vec<&'a str> {
+    return vec![
+        "config",
+        "known_hosts",
+        "known_hosts.old",
+        "authorized_keys",
+        "authorized_keys2",
+        "environment",
+        "rc",
+    ];
 }

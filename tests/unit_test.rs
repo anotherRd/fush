@@ -1,6 +1,6 @@
 use std::{assert_eq, assert_ne, fs::{self, OpenOptions}};
 
-use fush::{config::key_dir, helper::{check_requirement, create_key_pair, key_pair_exists}};
+use fush::{config::key_dir, helper::{general_helper::check_requirement, node_helper::{create_key_pair, key_pair_exists}}};
 use tokio::sync::OnceCell;
 
 static SETUP: OnceCell<()> = OnceCell::const_new();

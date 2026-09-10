@@ -1,9 +1,11 @@
 use crate::dto::node_dto::ParentNodeDto;
+use crate::helper::general_helper::custom_print;
+use crate::helper::node_helper::create_key_pair;
 use crate::{dto::node_dto::NodeDto, service_params::node_service_params::EditServerServiceParams};
 use crate::service_params::node_service_params::AddServerServiceParams;
 use crate::database::get_db_pool;
-use crate::helper::{create_key_pair, custom_print, db_array_placeholders};
 use sqlx::{Row};
+use crate::helper::database_helper::db_array_placeholders;
 
 pub async fn find_node_by_name(name: &str) -> Result<NodeDto, Box<dyn std::error::Error>> {
     let pool = get_db_pool().await?;
@@ -248,16 +250,4 @@ pub async fn delete_all() -> Result<(), Box<dyn std::error::Error>> {
     tx.commit().await?;
 
     Ok(())
-}
-
-pub fn get_blacklisted_key_name<'a>() -> Vec<&'a str> {
-    return vec![
-        "config",
-        "known_hosts",
-        "known_hosts.old",
-        "authorized_keys",
-        "authorized_keys2",
-        "environment",
-        "rc",
-    ];
 }

@@ -1,4 +1,4 @@
-use fush::{helper::key_pair_exists, service::node_service::{self, delete_all, get_blacklisted_key_name}, service_params::node_service_params::AddServerServiceParams};
+use fush::{config::blacklisted_key_name, helper::node_helper::key_pair_exists, service::node_service::{self, delete_all}, service_params::node_service_params::AddServerServiceParams};
 use rexpect::{error::Error, process::Signal, session::{PtySession, spawn_command}};
 use sqlx::Row;
 use tokio::sync::OnceCell;
@@ -248,7 +248,7 @@ async fn test_add_server_blacklisted_key() {
     exp_string_assert(p.exp_string("Key name (create if not exists and use default key/password if empty): "), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line(&key), &mut p, file!(), line!(), column!());
 
-    exp_string_assert(p.exp_string(&format!("Key name can't be on of [{}]", &get_blacklisted_key_name().join(", "))), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Key name can't be on of [{}]", &blacklisted_key_name().join(", "))), &mut p, file!(), line!(), column!());
     
     p.process_mut().kill(Signal::SIGKILL).unwrap();
 
@@ -490,7 +490,7 @@ async fn test_edit_server_blacklisted_key() {
     exp_string_assert(p.exp_string("Key name (create if not exists and use default key/password if empty): "), &mut p, file!(), line!(), column!());
     send_line_assert(p.send_line("authorized_keys"), &mut p, file!(), line!(), column!());
 
-    exp_string_assert(p.exp_string(&format!("Key name can't be on of [{}]", &get_blacklisted_key_name().join(", "))), &mut p, file!(), line!(), column!());
+    exp_string_assert(p.exp_string(&format!("Key name can't be on of [{}]", &blacklisted_key_name().join(", "))), &mut p, file!(), line!(), column!());
 
     p.process_mut().kill(Signal::SIGKILL).unwrap();
     
