@@ -123,6 +123,12 @@ These are the requirements for building **Fush**:
 
 *Note: All of the requirements must be executable on the command line*
 
+### Test
+If you want to run the test, run this command
+```
+cargo run -- test
+```
+
 ### Build
 ```
 cargo build --release
@@ -161,8 +167,9 @@ or
 ```
 fush e
 ```
+You can leave the input empty to leave the value unchanged
 
-The key name rules are the same with add server
+*Note: The key name rules are the same with add server*
 
 ### Delete server
 To delete multiple servers run :
@@ -174,7 +181,7 @@ or
 fush d
 ```
 
-You can choose multiple servers by toggling the marker with Shift+Tab
+You can choose multiple servers by toggling the marker with **Shift+Tab**
 
 *Note: The key used by the deleted server will not be deleted*
 
@@ -210,7 +217,7 @@ or
 fush si
 ```
 
-### Scan server for container
+### Scan server for containers
 To scan containers inside multiple servers run :
 ```
 fush scan
@@ -220,11 +227,11 @@ or
 fush s
 ```
 
-You can choose multiple servers by toggling the marker with Shift+Tab
+You can choose multiple servers by toggling the marker with **Shift+Tab**
 
 *Note: Only running containers will be saved*
 
-### Scan all server for container
+### Scan all servers for containers
 To scan containers inside all of saved servers run :
 ```
 fush scan-all
