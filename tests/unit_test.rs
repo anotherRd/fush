@@ -1,6 +1,6 @@
 use std::{assert_eq, assert_ne, fs::{self, OpenOptions}};
 
-use fush::{config::key_dir, helper::{general_helper::check_requirement, node_helper::{create_key_pair, key_pair_exists}}};
+use fush::{config::key_dir, helper::{general_helper::{check_requirement, is_test}, node_helper::{create_key_pair, key_pair_exists}}};
 use tokio::sync::OnceCell;
 
 static SETUP: OnceCell<()> = OnceCell::const_new();
@@ -21,6 +21,12 @@ async fn setup() {
         .await;
 }
 
+fn check_condition() {
+    if !is_test() {
+        panic!("FUSH_TEST env must be 1");
+    }
+}
+
 fn create_file_dummy(name: &str) {
     let key_dir = key_dir().unwrap().join(name);
     OpenOptions::new()
@@ -39,6 +45,7 @@ fn read_file_dummy(name: &str) -> String {
 
 #[tokio::test]
 async fn test_requirement_installed() {
+    check_condition();
     setup().await;
 
     let check_requirement = check_requirement();
@@ -47,6 +54,7 @@ async fn test_requirement_installed() {
 
 #[tokio::test]
 async fn test_key_pair_exists() {
+    check_condition();
     setup().await;
 
     // key not found = false
@@ -68,6 +76,7 @@ async fn test_key_pair_exists() {
 
 #[tokio::test]
 async fn test_create_key_pair_exists() {
+    check_condition();
     setup().await;
 
     // file not existed
@@ -142,6 +151,7 @@ async fn test_create_key_pair_exists() {
 
 #[tokio::test]
 async fn test_blacklisted_key_name() {
+    check_condition();
     setup().await;
 
     assert_eq!(true, create_key_pair("config", false, Some(String::new())).is_err());

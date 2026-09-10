@@ -1,30 +1,37 @@
 use clap::{CommandFactory, Parser};
 use fush::custom_command::{Cli, Commands};
-use fush::helper::general_helper::{check_requirement};
+use fush::helper::general_helper::{is_test};
 use fush::helper::node_helper::{select_multi_server, select_node, select_server};
 use fush::interaction_function::{add_server, connect, delete_server, edit_server, scan_server_container, show_info, show_key};
+use fush::setup::main_setup;
 use std::{vec};
-use std::process::{Command};
-use fush::config::{is_test};
-use fush::migration::migrate;
-use fush::config::{init_config};
 
-pub async fn prepare() -> Result<(), Box<dyn std::error::Error>> {
-    // check requirement
-    check_requirement()?;
+#[cfg(debug_assertions)]
+async fn test () -> Result<(), Box<dyn std::error::Error>> {
+    use std::process::{Command};
+    let status = Command::new("cargo")
+        .env("FUSH_TEST", "1")
+        .args(["test", "--", "--test-threads", "1"])
+        .status()?;
 
-    // init config
-    init_config()?;
-
-    // migrate db
-    migrate().await?;
+    if !status.success() {
+        return Err(format!("{status}").into());
+    }
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    prepare().await?;
+    // for test
+    #[cfg(debug_assertions)]
+    if let Some(command) = Cli::parse().command {
+        if command == Commands::Test {
+            return test().await;
+        }
+    }
+
+    main_setup().await?;
 
     // command
     let cli = Cli::parse();
@@ -98,28 +105,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             show_info(selected).await?;
         },
         #[cfg(debug_assertions)]
-        Some(Commands::Prepare) =>  {
-            prepare().await?;
-        }
-        #[cfg(debug_assertions)]
         Some(Commands::Test) =>  {
-            let status = Command::new("cargo")
-                .env("FUSH_TEST", "1")
-                .args(["run", "--", "prepare"])
-                .status()?;
-
-            if !status.success() {
-                return Err(format!("{status}").into());
-            }
-
-            let status = Command::new("cargo")
-                .env("FUSH_TEST", "1")
-                .args(["test", "--", "--test-threads", "1"])
-                .status()?;
-
-            if !status.success() {
-                return Err(format!("{status}").into());
-            }
+            
         }
         None => Cli::command().print_help()?
     }

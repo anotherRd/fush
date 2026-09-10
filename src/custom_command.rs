@@ -7,7 +7,7 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommand, PartialEq)]
 pub enum Commands {
     #[command(alias = "c", about = "(alias: c) - connect to server or container\nusage: fush connect \"container: project-nginx-1\" or wihtout argument to use selector\n")]
     Conenct {
@@ -44,6 +44,4 @@ pub enum Commands {
     },
     #[cfg(debug_assertions)]
     Test,
-    #[cfg(debug_assertions)]
-    Prepare,
 }

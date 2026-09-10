@@ -1,4 +1,4 @@
-use fush::{config::blacklisted_key_name, helper::node_helper::key_pair_exists, service::node_service::{self, delete_all}, service_params::node_service_params::AddServerServiceParams};
+use fush::{config::blacklisted_key_name, helper::{general_helper::is_test, node_helper::key_pair_exists}, service::node_service::{self, delete_all}, service_params::node_service_params::AddServerServiceParams, setup::main_setup};
 use rexpect::{error::Error, process::Signal, session::{PtySession, spawn_command}};
 use sqlx::Row;
 use tokio::sync::OnceCell;
@@ -12,6 +12,9 @@ const BINARY: &str = env!("CARGO_BIN_EXE_fush");
 async fn setup() {
     SETUP
         .get_or_init(|| async {
+            // main setup
+            main_setup().await.unwrap();
+
             let pool = get_db_pool().await.unwrap();
             let mut tx = pool.begin().await.unwrap();
             
@@ -32,6 +35,16 @@ async fn setup() {
             tx.commit().await.unwrap();
         })
         .await;
+}
+
+fn check_condition() {
+    if !is_test() {
+        panic!("FUSH_TEST env must be 1");
+    }
+}
+
+async fn clear_db() {
+    delete_all().await.unwrap();
 }
 
 fn spawn_test(args: &Vec<&str>, mut timeout_ms: Option<u64>) -> Result<rexpect::session::PtySession, Error> {
@@ -92,8 +105,10 @@ fn eof_assert(
 
 #[tokio::test]
 async fn test_add_server() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "add_server";
     let user = "user_add_server";
@@ -140,8 +155,10 @@ async fn test_add_server() {
 
 #[tokio::test]
 async fn test_add_server_default_value() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "add_server_default_value";
     let user = "user_add_server_default_value";
@@ -183,8 +200,10 @@ async fn test_add_server_default_value() {
 
 #[tokio::test]
 async fn test_add_server_duplicate_name() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "add_server_duplicate_name";
     let user = "user_add_server_duplicate_name";
@@ -222,8 +241,10 @@ async fn test_add_server_duplicate_name() {
 
 #[tokio::test]
 async fn test_add_server_blacklisted_key() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "add_server_blacklisted_key";
     let user = "user_add_server_blacklisted_key";
@@ -257,8 +278,10 @@ async fn test_add_server_blacklisted_key() {
 
 #[tokio::test]
 async fn test_edit_server() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name_before = "edit_server_before";
     let user_before = "user_edit_server_before";
@@ -332,8 +355,10 @@ async fn test_edit_server() {
 
 #[tokio::test]
 async fn test_edit_server_unchanged() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name_before = "edit_server_unchanged";
     let user_before = "user_edit_server_unchanged";
@@ -394,8 +419,10 @@ async fn test_edit_server_unchanged() {
 
 #[tokio::test]
 async fn test_edit_server_duplicate() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name_before = "edit_server_duplicate";
     let user_before = "user_edit_server_duplicate";
@@ -446,8 +473,10 @@ async fn test_edit_server_duplicate() {
 
 #[tokio::test]
 async fn test_edit_server_blacklisted_key() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name_before = "edit_server_blacklisted_key";
     let user_before = "user_edit_server_blacklisted_key";
@@ -499,8 +528,10 @@ async fn test_edit_server_blacklisted_key() {
 
 #[tokio::test]
 async fn test_delete_server() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "delete_server";
     let user = "user_delete_server";
@@ -536,8 +567,10 @@ async fn test_delete_server() {
 
 #[tokio::test]
 async fn test_delete_server_cancel() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "delete_server_cancel";
     let user = "user_delete_server_cancel";
@@ -571,8 +604,10 @@ async fn test_delete_server_cancel() {
 
 #[tokio::test]
 async fn test_scan_server_container_selecttion() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "scan_server_container_selecttion";
     let user = "user_scan_server_container_selecttion";
@@ -610,8 +645,10 @@ async fn test_scan_server_container_selecttion() {
 
 #[tokio::test]
 async fn test_scan_server_container_all() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "scan_server_container_all";
     let user = "user_scan_server_container_all";
@@ -650,8 +687,10 @@ async fn test_scan_server_container_all() {
 
 #[tokio::test]
 async fn test_connect_to_server() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "connect_to_server";
     let user = "user_connect_to_server";
@@ -682,8 +721,10 @@ async fn test_connect_to_server() {
 
 #[tokio::test]
 async fn test_connect_to_server_default_key() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "connect_to_server_default_key";
     let user = "user_connect_to_server_default_key";
@@ -711,8 +752,10 @@ async fn test_connect_to_server_default_key() {
 
 #[tokio::test]
 async fn test_connect_to_container() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "connect_to_container";
 
@@ -727,8 +770,10 @@ async fn test_connect_to_container() {
 
 #[tokio::test]
 async fn test_connect_to_server_container() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "connect_to_server_container";
     let user = "user_connect_to_server_container";
@@ -763,8 +808,10 @@ async fn test_connect_to_server_container() {
 
 #[tokio::test]
 async fn test_show_key() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "show_key";
     let user = "user_show_key";
@@ -795,8 +842,10 @@ async fn test_show_key() {
 
 #[tokio::test]
 async fn test_show_key_default_key() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "show_key_default_key";
     let user = "user_show_key_default_key";
@@ -823,8 +872,10 @@ async fn test_show_key_default_key() {
 
 #[tokio::test]
 async fn test_show_detail_container() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
     
     let name = "show_detail_container";
 
@@ -837,8 +888,10 @@ async fn test_show_detail_container() {
 
 #[tokio::test]
 async fn test_show_detail_server_default_key() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "show_detail_server_default_key";
     let user = "user_show_detail_server_default_key";
@@ -867,8 +920,10 @@ async fn test_show_detail_server_default_key() {
 
 #[tokio::test]
 async fn test_show_detail_server_custom_key() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "show_detail_server_custom_key";
     let user = "user_show_detail_server_custom_key";
@@ -897,8 +952,10 @@ async fn test_show_detail_server_custom_key() {
 
 #[tokio::test]
 async fn test_show_detail_server_container() {
+    check_condition();
+
     setup().await;
-    delete_all().await.unwrap();
+    clear_db().await;
 
     let name = "show_detail_server_container";
     let user = "user_show_detail_server_container";

@@ -1,5 +1,8 @@
 use crate::config::requirements;
 
+pub fn is_test() -> bool {
+    std::env::var_os("FUSH_TEST").is_some()
+}
 
 pub fn check_requirement() -> Result<(), Box<dyn std::error::Error>> {
     // get requirement

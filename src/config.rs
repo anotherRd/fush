@@ -2,9 +2,7 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::{fs};
 
-pub fn is_test() -> bool {
-    std::env::var_os("FUSH_TEST").is_some()
-}
+use crate::helper::general_helper::is_test;
 
 pub fn app_name() -> String {
     "fush".to_string()

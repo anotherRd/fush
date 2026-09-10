@@ -1,9 +1,7 @@
 use std::io::Cursor;
 
 use skim::{Skim, options::SkimOptionsBuilder, prelude::SkimItemReader};
-use sqlx::Row;
 
-use crate::database::get_db_pool;
 
 pub fn selection(title: &str, candidate: String) -> Result <String, Box<dyn std::error::Error>> { 
     let mut result = String::new();
